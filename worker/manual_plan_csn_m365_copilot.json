@@ -1,0 +1,56 @@
+{
+  "title": "Copilot lộ dữ liệu? Microsoft vá 3 lỗi Critical",
+  "target_duration_sec": 66,
+  "scenes": [
+    {
+      "id": "s1",
+      "role": "hook",
+      "duration_sec": 8,
+      "caption_lines": ["Copilot lộ 3 lỗ hổng", "Microsoft nói đã vá xong"],
+      "voiceover": "Tin nóng: Microsoft 365 Copilot vừa bị phát hiện 3 lỗ hổng rò rỉ thông tin. Microsoft nói họ đã khắc phục hoàn toàn ở phía dịch vụ cloud, nên người dùng không cần làm gì ngay."
+    },
+    {
+      "id": "s2",
+      "role": "why_matters",
+      "duration_sec": 8,
+      "caption_lines": ["Copilot đọc email + Teams + docs", "Leak = lộ dữ liệu nội bộ"],
+      "voiceover": "Vì sao đáng lo? Copilot có thể tổng hợp dữ liệu từ email, tài liệu và chat Teams. Nếu cách xử lý đầu vào hoặc đầu ra có vấn đề, thông tin nhạy cảm có thể bị rò rỉ qua ranh giới tin cậy."
+    },
+    {
+      "id": "s3",
+      "role": "what_happened",
+      "duration_sec": 10,
+      "caption_lines": ["3 CVE: 26129, 26164, 33111", "Công bố 07/05/2026"],
+      "voiceover": "Microsoft Security Response Center đã đăng advisory cho CVE-2026-26129, CVE-2026-26164 và CVE-2026-33111 vào ngày 7 tháng 5 năm 2026. Hai CVE đầu ảnh hưởng M365 Copilot, còn CVE-2026-33111 ảnh hưởng Copilot Chat trong Microsoft Edge."
+    },
+    {
+      "id": "s4",
+      "role": "evidence",
+      "duration_sec": 10,
+      "caption_lines": ["Injection / command injection", "Rò rỉ info qua mạng"],
+      "voiceover": "Theo mô tả, các lỗi liên quan đến injection: không vô hiệu hóa đúng các ký tự đặc biệt trong output hoặc lệnh, có thể dẫn tới rò rỉ thông tin. Điểm chung: tấn công qua mạng, không cần quyền cao, không cần tương tác người dùng, nhưng tác động bí mật dữ liệu rất lớn."
+    },
+    {
+      "id": "s5",
+      "role": "context",
+      "duration_sec": 10,
+      "caption_lines": ["Cloud-side: đã mitigate", "Không cần bạn patch máy"],
+      "voiceover": "Điểm quan trọng: đây là lỗ hổng phía cloud. Microsoft cho biết họ đã triển khai biện pháp giảm thiểu ở tầng dịch vụ, nên doanh nghiệp không cần cài bản vá hay thay đổi cấu hình để được bảo vệ khỏi ba CVE này."
+    },
+    {
+      "id": "s6",
+      "role": "impact",
+      "duration_sec": 10,
+      "caption_lines": ["Copilot có quyền rất rộng", "Rủi ro: IP, email, Teams"],
+      "voiceover": "Nhưng vì Copilot truy cập dữ liệu tổ chức rất rộng, chỉ cần cấp quyền quá thoáng là rủi ro phình to: lộ sở hữu trí tuệ, trao đổi nội bộ, hoặc các hồ sơ bị hạn chế. Và Copilot Chat trong Edge càng đáng chú ý vì Edge được triển khai rất phổ biến."
+    },
+    {
+      "id": "s7",
+      "role": "takeaway",
+      "duration_sec": 10,
+      "caption_lines": ["Action: siết quyền Copilot", "Least-privilege + giám sát"],
+      "voiceover": "Kết lại: bạn không cần patch client cho sự cố này, nhưng nên rà lại quyền truy cập dữ liệu của Copilot, áp dụng least-privilege, và giám sát để giảm thiểu tác động nếu có lỗ hổng tương tự trong tương lai."
+    }
+  ]
+}
+

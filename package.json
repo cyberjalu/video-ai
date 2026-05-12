@@ -1,0 +1,40 @@
+{
+  "name": "url-to-tiktok-video-tauri",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "worker:render": "tsx ./worker/index.ts",
+    "render:openai": "tsx ./worker/index.ts --url \"https://openai.com/index/gpt-5-5-with-trusted-access-for-cyber/\""
+  },
+  "dependencies": {
+    "@fontsource/montserrat": "^5.2.8",
+    "@google/genai": "^1.0.0",
+    "@mozilla/readability": "^0.5.0",
+    "@remotion/bundler": "^4.0.287",
+    "@remotion/renderer": "^4.0.287",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-opener": "^2",
+    "jsdom": "^26.1.0",
+    "playwright": "^1.53.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "remotion": "^4.0.287",
+    "wav": "^1.0.2",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "tsx": "^4.20.5",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.4"
+  }
+}
