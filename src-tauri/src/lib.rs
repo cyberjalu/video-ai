@@ -13,17 +13,22 @@ struct RenderOptions {
     enable_callouts: Option<bool>,
     enable_progress: Option<bool>,
     layout_mode: Option<String>,
+    voice: Option<String>,
 }
 
 #[tauri::command]
 fn start_render(
     app: tauri::AppHandle,
-    url: String,
+    url: Option<String>,
+    prompt: Option<String>,
     gemini_api_key: String,
     options: Option<RenderOptions>,
 ) -> Result<(), String> {
-    if url.trim().is_empty() {
-        return Err("URL trống".into());
+    let url = url.unwrap_or_default();
+    let prompt = prompt.unwrap_or_default();
+
+    if url.trim().is_empty() && prompt.trim().is_empty() {
+        return Err("Phải cung cấp URL hoặc Prompt".into());
     }
     if gemini_api_key.trim().is_empty() {
         return Err("Thiếu GEMINI_API_KEY".into());
@@ -54,15 +59,24 @@ fn start_render(
             .as_ref()
             .and_then(|o| o.enable_progress)
             .unwrap_or(true);
+        let voice = options
+            .as_ref()
+            .and_then(|o| o.voice.as_deref())
+            .unwrap_or("Zephyr");
 
         let mut cmd = Command::new("node");
         cmd.current_dir(&workdir)
             .env("GEMINI_API_KEY", gemini_api_key)
             .arg("./node_modules/.bin/tsx")
-            .arg("./worker/index.ts")
-            .arg("--url")
-            .arg(url)
-            .arg("--preset")
+            .arg("./worker/index.ts");
+
+        if !url.trim().is_empty() {
+            cmd.arg("--url").arg(url);
+        } else if !prompt.trim().is_empty() {
+            cmd.arg("--prompt").arg(prompt);
+        }
+
+        cmd.arg("--preset")
             .arg(preset)
             .arg("--layoutMode")
             .arg(layout_mode)
@@ -70,6 +84,8 @@ fn start_render(
             .arg(if enable_callouts { "true" } else { "false" })
             .arg("--enableProgress")
             .arg(if enable_progress { "true" } else { "false" })
+            .arg("--voice")
+            .arg(voice)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
 
@@ -108,11 +124,38 @@ fn start_render(
     Ok(())
 }
 
+#[tauri::command]
+fn read_text_file(path: String) -> Result<String, String> {
+    if path.trim().is_empty() {
+        return Err("Thiếu path".into());
+    }
+
+    let workdir = std::env::current_dir()
+        .ok()
+        .and_then(|d| d.parent().map(|p| p.to_path_buf()))
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+    let output_root = workdir.join("output");
+
+    let output_root_canon = std::fs::canonicalize(&output_root).unwrap_or(output_root);
+    let file_canon = std::fs::canonicalize(&path).map_err(|e| format!("Không đọc được file: {e}"))?;
+
+    if !file_canon.starts_with(&output_root_canon) {
+        return Err("Không được phép truy cập file ngoài output/".into());
+    }
+
+    let meta = std::fs::metadata(&file_canon).map_err(|e| format!("Không đọc được file: {e}"))?;
+    if meta.len() > 5 * 1024 * 1024 {
+        return Err("File quá lớn".into());
+    }
+
+    std::fs::read_to_string(&file_canon).map_err(|e| format!("Không đọc được file: {e}"))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet, start_render])
+        .invoke_handler(tauri::generate_handler![greet, start_render, read_text_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

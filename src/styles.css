@@ -1,0 +1,109 @@
+/* Tailwind v4 pre-generated CSS (run: node generate-tailwind.cjs to regenerate) */
+@import "./tailwind-generated.css";
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  body {
+    background-color: var(--color-zinc-950, #09090b);
+    color: var(--color-zinc-100, #f4f4f5);
+    font-family: "Montserrat", ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 100px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.22);
+  }
+
+  /* Better focus styles */
+  *:focus-visible {
+    outline: 2px solid rgba(139, 92, 246, 0.6);
+    outline-offset: 2px;
+    border-radius: 8px;
+  }
+
+  details > summary {
+    list-style: none;
+  }
+  details > summary::-webkit-details-marker {
+    display: none;
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.0) 0%,
+    rgba(255, 255, 255, 0.05) 50%,
+    rgba(255, 255, 255, 0.0) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+/* Custom design tokens from tailwind.config.cjs */
+.bg-clipnews-radial {
+  background-image:
+    radial-gradient(900px circle at 8% 12%, rgba(139,92,246,0.22) 0%, rgba(10,10,10,0) 55%),
+    radial-gradient(900px circle at 88% 16%, rgba(34,211,238,0.14) 0%, rgba(10,10,10,0) 60%),
+    radial-gradient(700px circle at 55% 92%, rgba(59,130,246,0.10) 0%, rgba(10,10,10,0) 55%);
+}
+
+.bg-hero-grid {
+  background-image:
+    linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px);
+}
+
+.bg-grid-40 { background-size: 40px 40px; }
+
+.shadow-glow {
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.10), 0 20px 80px rgba(0,0,0,0.55);
+}
+
+.shadow-glow-violet {
+  box-shadow: 0 0 40px rgba(139,92,246,0.25), 0 0 0 1px rgba(139,92,246,0.20);
+}
+
+.shadow-card {
+  box-shadow: 0 18px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.05);
+}
+
+/* Extra opacity utilities for bg-white/6 and bg-white/8 */
+.bg-white\/6 { background-color: rgba(255, 255, 255, 0.06); }
+.bg-white\/8 { background-color: rgba(255, 255, 255, 0.08); }
+.bg-white\/4 { background-color: rgba(255, 255, 255, 0.04); }
+.bg-black\/25 { background-color: rgba(0, 0, 0, 0.25); }
+.bg-black\/30 { background-color: rgba(0, 0, 0, 0.30); }
+.bg-black\/40 { background-color: rgba(0, 0, 0, 0.40); }
+.ring-white\/10 { --tw-ring-color: rgba(255, 255, 255, 0.10); }
+
+/* Force pointer-events utilities in case generator misses them */
+.pointer-events-none { pointer-events: none !important; }
+.pointer-events-auto { pointer-events: auto !important; }

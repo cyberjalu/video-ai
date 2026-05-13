@@ -11,7 +11,8 @@ import { bundle } from "@remotion/bundler";
 import { getCompositions, renderMedia } from "@remotion/renderer";
 
 const ArgsSchema = z.object({
-  url: z.string().url(),
+  url: z.string().url().optional(),
+  prompt: z.string().optional(),
   geminiKey: z.string().optional(),
   openaiKey: z.string().optional(),
   planFile: z.string().optional(),
@@ -21,6 +22,7 @@ const ArgsSchema = z.object({
   layoutMode: z.enum(["tri", "dual", "mono"]).optional(),
   enableCallouts: z.boolean().optional(),
   enableProgress: z.boolean().optional(),
+  voice: z.string().optional(),
 });
 
 type SceneRole =
@@ -47,6 +49,7 @@ type RenderPrefs = {
 const VideoPlanSchema = z.object({
   title: z.string(),
   target_duration_sec: z.number().int().min(20).max(180),
+  audio_prompt: z.string().optional(),
   scenes: z
     .array(
       z.object({
@@ -92,6 +95,7 @@ function parseArgs(argv: string[]) {
 
   return ArgsSchema.parse({
     url: out.url,
+    prompt: out.prompt,
     geminiKey: out.geminiKey ?? process.env.GEMINI_API_KEY,
     openaiKey: out.openaiKey ?? process.env.OPENAI_API_KEY,
     planFile: out.planFile,
@@ -101,6 +105,7 @@ function parseArgs(argv: string[]) {
     layoutMode: out.layoutMode as LayoutMode | undefined,
     enableCallouts: parseBool(out.enableCallouts),
     enableProgress: parseBool(out.enableProgress),
+    voice: out.voice,
   });
 }
 
@@ -410,20 +415,42 @@ Trả về JSON theo schema:
 {
   "title": string,
   "target_duration_sec": number,
+  "audio_prompt": "string (Markdown chuẩn theo mẫu AUDIO PROFILE để đưa vào TTS)",
   "scenes": [
     {
       "id": "s1",
       "role": "hook|re_hook|why_matters|what_happened|evidence|context|impact|takeaway",
       "duration_sec": number (3-14),
       "caption_lines": [string, string?],
-      "voiceover": string,
+      "voiceover": "string (ví dụ: [excitedly] Chào các bạn!)",
       "layout": "screenshot|big_callout|split",
       "callouts": [string, string?]
     }
   ]
 }
 
-Ràng buộc:
+Yêu cầu cực kỳ quan trọng cho \`audio_prompt\`:
+- BẠN BẮT BUỘC phải tạo ra một \`audio_prompt\` dạng Markdown có cấu trúc chính xác như sau:
+\`\`\`markdown
+# AUDIO PROFILE: [Tên một Voice phù hợp]
+## "[Tiêu đề video]"
+
+## THE SCENE: [Mô tả chi tiết bối cảnh phòng thu, thời gian, hành động của người nói]
+
+### DIRECTOR'S NOTES
+Style: [Mô tả phong cách đọc, độ mở của giọng, khẩu hình...]
+Pace: [Mô tả tốc độ, nhịp điệu]
+Accent: [Giọng vùng miền hoặc đặc trưng]
+
+### SAMPLE CONTEXT
+[Mô tả bối cảnh chuyên môn hoặc role của người nói]
+
+#### TRANSCRIPT
+[Sao chép toàn bộ voiceover của các scene ghép lại với nhau, bao gồm cả các tag cảm xúc như [shouting], [excitedly], v.v.]
+\`\`\`
+- Phần TRANSCRIPT bên trong \`audio_prompt\` PHẢI khớp 100% với việc ghép tất cả các \`voiceover\` trong mảng \`scenes\` lại với nhau.
+
+Ràng buộc chung:
 - ${arc}
 - ${durationTarget}
 ${secondHookRule}
@@ -459,6 +486,102 @@ async function planVideoWithGemini(articleText: string, title: string, geminiKey
 
     try {
       const parsed = parsePlanFromModelOutput(res.text ?? "");
+      const plan = normalizePlan(parsed, prefs);
+      emit({
+        type: "step_done",
+        step: "plan",
+        scenes: plan.scenes.length,
+        target: plan.target_duration_sec,
+        attempt,
+      });
+      return plan;
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
+      emit({ type: "log", step: "plan", message: `Plan parse retry ${attempt}: ${lastError}` });
+    }
+  }
+  throw new Error(`Không tạo được video plan hợp lệ: ${lastError}`);
+}
+
+function buildPromptPlanPrompt(userPrompt: string, prefs: RenderPrefs) {
+  const arc = "4-6 scenes tập trung vào hook mạnh mẽ, diễn giải chi tiết và kết luận.";
+  const durationTarget = "Tổng duration mục tiêu 30-60 giây.";
+  const calloutRule = prefs.enableCallouts
+    ? "- Mỗi scene phải có callouts 1-2 item ngắn (6-28 ký tự), và callouts phải xuất hiện trong voiceover."
+    : "- Để callouts là mảng rỗng [].";
+
+  return `Bạn là biên tập viên video TikTok tiếng Việt.
+Mục tiêu: Tạo kịch bản video dựa trên yêu cầu của người dùng, giữ retention cao, ngôn ngữ tự nhiên.
+
+Trả về JSON theo schema:
+{
+  "title": string,
+  "target_duration_sec": number,
+  "audio_prompt": "string (Markdown chuẩn theo mẫu AUDIO PROFILE để đưa vào TTS)",
+  "scenes": [
+    {
+      "id": "s1",
+      "role": "hook|why_matters|what_happened|evidence|context|impact|takeaway",
+      "duration_sec": number (5-12),
+      "caption_lines": [string, string?],
+      "voiceover": "string (ví dụ: [excitedly] Chào các bạn!)",
+      "layout": "big_callout|split",
+      "callouts": [string, string?]
+    }
+  ]
+}
+
+Yêu cầu cực kỳ quan trọng cho \`audio_prompt\`:
+- BẠN BẮT BUỘC phải tạo ra một \`audio_prompt\` dạng Markdown có cấu trúc chính xác như sau:
+\`\`\`markdown
+# AUDIO PROFILE: [Tên một Voice phù hợp]
+## "[Tiêu đề video]"
+
+## THE SCENE: [Mô tả chi tiết bối cảnh phòng thu, thời gian, hành động của người nói]
+
+### DIRECTOR'S NOTES
+Style: [Mô tả phong cách đọc, độ mở của giọng, khẩu hình...]
+Pace: [Mô tả tốc độ, nhịp điệu]
+Accent: [Giọng vùng miền hoặc đặc trưng]
+
+### SAMPLE CONTEXT
+[Mô tả bối cảnh chuyên môn hoặc role của người nói]
+
+#### TRANSCRIPT
+[Sao chép toàn bộ voiceover của các scene ghép lại với nhau, bao gồm cả các tag cảm xúc như [shouting], [excitedly], v.v.]
+\`\`\`
+- Phần TRANSCRIPT bên trong \`audio_prompt\` PHẢI khớp 100% với việc ghép tất cả các \`voiceover\` trong mảng \`scenes\` lại với nhau.
+
+Ràng buộc chung:
+- ${arc}
+- ${durationTarget}
+- caption_lines tối đa 2 dòng, mỗi dòng <= 42 ký tự.
+- caption_lines là tóm tắt trực tiếp của voiceover.
+- voiceover mở đầu bằng câu diễn giải lại caption_lines.
+${calloutRule}
+- Layout MẶC ĐỊNH bắt buộc là "big_callout" hoặc "split" vì video này dạng Typography (không có ảnh). ĐỪNG trả về "screenshot".
+- Giọng văn: Kể chuyện hấp dẫn, cuốn hút, dứt khoát.
+
+Yêu cầu/Ý tưởng của người dùng:
+"${userPrompt}"`;
+}
+
+async function planVideoFromPromptWithGemini(userPrompt: string, geminiKey: string, prefs: RenderPrefs) {
+  emit({ type: "step_start", step: "plan" });
+  const ai = new GoogleGenAI({ apiKey: geminiKey });
+  const prompt = buildPromptPlanPrompt(userPrompt, prefs);
+
+  let lastError = "";
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const res = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [{ parts: [{ text: prompt }] }],
+    });
+
+    try {
+      const parsed = parsePlanFromModelOutput(res.text ?? "");
+      // Force big_callout
+      parsed.scenes = parsed.scenes.map(s => ({ ...s, layout: s.layout === 'screenshot' ? 'big_callout' : s.layout }));
       const plan = normalizePlan(parsed, prefs);
       emit({
         type: "step_done",
@@ -516,7 +639,7 @@ async function planVideoWithOpenAI(
   return plan;
 }
 
-async function geminiTtsToWav(text: string, outFile: string, geminiKey: string) {
+async function geminiTtsToWav(text: string, outFile: string, geminiKey: string, voiceName: string = "Zephyr") {
   emit({ type: "step_start", step: "tts" });
   const ai = new GoogleGenAI({ apiKey: geminiKey });
 
@@ -527,7 +650,7 @@ async function geminiTtsToWav(text: string, outFile: string, geminiKey: string) 
       responseModalities: ["AUDIO"],
       speechConfig: {
         voiceConfig: {
-          prebuiltVoiceConfig: { voiceName: "Charon" },
+          prebuiltVoiceConfig: { voiceName },
         },
       },
     },
@@ -904,28 +1027,44 @@ async function main() {
     now.getDate(),
   ).padStart(2, "0")}__${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
 
-  const baseOut =
-    args.outDir ?? path.join(process.cwd(), "output", `${stamp}__${slugify(args.url)}`);
+  const slug = args.url ? slugify(args.url) : "prompt-" + stamp;
+  const baseOut = args.outDir ?? path.join(process.cwd(), "output", `${stamp}__${slug}`);
   await ensureDir(baseOut);
 
   try {
     emit({ type: "step_start", step: "config", prefs });
-    // Extract article và generate plan trong cùng 1 session để tránh rate limit
-    const { browser, page, articleJson } = await extractArticle(args.url, baseOut);
     
-    const screenshotsMeta = await captureScreenshots(page, baseOut, articleJson.paragraphs);
+    let browser, page, articleJson, screenshotsMeta: Record<string, { path: string }> = {};
+    let plan: VideoPlan;
 
-    const sourceText =
-      articleJson.text || articleJson.paragraphs.map((p: { text: string }) => p.text).join("\n");
+    if (args.prompt) {
+      emit({ type: "log", step: "config", message: "Chế độ Prompt: Bỏ qua extract/screenshot." });
+      if (args.planFile) {
+        plan = normalizePlan(VideoPlanSchema.parse(JSON.parse(await fs.readFile(args.planFile, "utf-8"))) as VideoPlan, prefs);
+      } else if (args.geminiKey) {
+        plan = await planVideoFromPromptWithGemini(args.prompt, args.geminiKey, prefs);
+      } else {
+        throw new Error("Chế độ Prompt hiện tại chỉ hỗ trợ Gemini. Vui lòng cung cấp GEMINI_API_KEY.");
+      }
+    } else if (args.url) {
+      const res = await extractArticle(args.url, baseOut);
+      browser = res.browser;
+      page = res.page;
+      articleJson = res.articleJson;
+      
+      screenshotsMeta = await captureScreenshots(page, baseOut, articleJson.paragraphs);
+      const sourceText = articleJson.text || articleJson.paragraphs.map((p: { text: string }) => p.text).join("\n");
 
-    let plan = args.planFile
-      ? normalizePlan(
-          VideoPlanSchema.parse(JSON.parse(await fs.readFile(args.planFile, "utf-8"))) as VideoPlan,
-          prefs,
-        )
-      : args.geminiKey
-        ? await planVideoWithGemini(sourceText, articleJson.title, args.geminiKey, prefs)
-        : await planVideoWithOpenAI(sourceText, articleJson.title, args.openaiKey!, prefs);
+      if (args.planFile) {
+        plan = normalizePlan(VideoPlanSchema.parse(JSON.parse(await fs.readFile(args.planFile, "utf-8"))) as VideoPlan, prefs);
+      } else if (args.geminiKey) {
+        plan = await planVideoWithGemini(sourceText, articleJson.title, args.geminiKey, prefs);
+      } else {
+        plan = await planVideoWithOpenAI(sourceText, articleJson.title, args.openaiKey!, prefs);
+      }
+    } else {
+      throw new Error("Phải cung cấp --url hoặc --prompt.");
+    }
 
     const audioPathRaw = path.join(baseOut, "tts", "voiceover.raw.wav");
     const audioPath = path.join(baseOut, "tts", "voiceover.wav");
@@ -936,9 +1075,11 @@ async function main() {
     let fittedAudioPath = audioPathRaw;
     for (let retry = 0; retry < 3; retry++) {
       const voiceover = plan.scenes.map((s) => s.voiceover.trim()).join("\n");
+      const ttsInput = plan.audio_prompt ? plan.audio_prompt : voiceover;
+
       if (ttsProvider === "gemini") {
         if (!args.geminiKey) throw new Error("tts=gemini nhưng thiếu GEMINI_API_KEY.");
-        await geminiTtsToWav(voiceover, audioPathRaw, args.geminiKey);
+        await geminiTtsToWav(ttsInput, audioPathRaw, args.geminiKey, args.voice);
       } else if (ttsProvider === "openai") {
         if (!args.openaiKey) throw new Error("tts=openai nhưng thiếu OPENAI_API_KEY.");
         await openaiTtsToWav(voiceover, audioPathRaw, args.openaiKey);
@@ -980,7 +1121,7 @@ async function main() {
     const mp4 = await renderRemotionVideo(baseOut, plan, fittedAudioPath, screenshotsMeta, prefs);
     await qc(baseOut, mp4);
 
-    await browser.close();
+    if (browser) await browser.close();
     emit({ type: "done", projectDir: baseOut, mp4 });
   } catch (err) {
     emit({ type: "error", message: err instanceof Error ? err.message : String(err) });
