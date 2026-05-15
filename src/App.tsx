@@ -10,6 +10,7 @@ import { ToastProvider, useToast } from "./components/Toast";
 import { CreateVideoPage } from "./pages/CreateVideoPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { HistoryPage } from "./pages/HistoryPage";
+import { TemplatesPage } from "./pages/TemplatesPage";
 
 import {
   applyWorkerEventToSteps,
@@ -401,18 +402,11 @@ function AppInner() {
           title={PAGE_TITLES[page]}
           status={status}
           onOpenOutputFolder={outputDir ? handleOpenOutputFolder : undefined}
-          onOpenSettings={() => setPage("settings")}
         />
       }
     >
       <AnimatePresence mode="wait">
-        <motion.div
-          key={page}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
-          transition={{ duration: 0.18, ease: "easeOut" }}
-        >
+        <div key={page} className="w-full h-full">
           {page === "create" && (
             <CreateVideoPage
               inputMode={inputMode}
@@ -447,6 +441,16 @@ function AppInner() {
 
           {page === "history" && <HistoryPage />}
 
+          {page === "templates" && (
+            <TemplatesPage
+              options={options}
+              onChangeOptions={(o) => {
+                setOptions(o);
+                saveRenderOptions(o);
+              }}
+            />
+          )}
+
           {page === "settings" && (
             <SettingsPage
               geminiKey={geminiKey}
@@ -459,7 +463,7 @@ function AppInner() {
               onSave={handleSaveSettings}
             />
           )}
-        </motion.div>
+        </div>
       </AnimatePresence>
     </AppShell>
   );

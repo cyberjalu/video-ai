@@ -3,9 +3,6 @@ module.exports = {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
-      fontFamily: {
-        sans: ["Montserrat", "ui-sans-serif", "system-ui", "sans-serif"],
-      },
       boxShadow: {
         glow: "0 0 0 1px rgba(255,255,255,0.10), 0 20px 80px rgba(0,0,0,0.55)",
         "glow-violet": "0 0 40px rgba(139,92,246,0.25), 0 0 0 1px rgba(139,92,246,0.20)",

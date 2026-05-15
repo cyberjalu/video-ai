@@ -1,8 +1,10 @@
 export type RenderPreset = "deep_explainer" | "news_60_80" | "ultra_25_35";
 export type LayoutMode = "tri" | "mono" | "dual";
+export type TemplateId = "NewsStoryV1" | "CorporateNewsV1";
 
 export type RenderOptions = {
   preset: RenderPreset;
+  template: TemplateId;
   enable_callouts: boolean;
   enable_progress: boolean;
   layout_mode: LayoutMode;
@@ -11,6 +13,7 @@ export type RenderOptions = {
 
 export const DEFAULT_OPTIONS: RenderOptions = {
   preset: "deep_explainer",
+  template: "NewsStoryV1",
   enable_callouts: true,
   enable_progress: true,
   layout_mode: "tri",

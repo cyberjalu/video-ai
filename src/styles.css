@@ -14,7 +14,7 @@
   body {
     background-color: var(--color-zinc-950, #09090b);
     color: var(--color-zinc-100, #f4f4f5);
-    font-family: "Montserrat", ui-sans-serif, system-ui, sans-serif;
+    font-family: ui-sans-serif, system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     font-feature-settings: "rlig" 1, "calt" 1;

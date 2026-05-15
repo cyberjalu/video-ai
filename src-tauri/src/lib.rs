@@ -10,6 +10,7 @@ fn greet(name: &str) -> String {
 #[derive(Debug, Clone, Deserialize)]
 struct RenderOptions {
     preset: Option<String>,
+    template: Option<String>,
     enable_callouts: Option<bool>,
     enable_progress: Option<bool>,
     layout_mode: Option<String>,
@@ -47,6 +48,10 @@ fn start_render(
             .as_ref()
             .and_then(|o| o.preset.as_deref())
             .unwrap_or("deep_explainer");
+        let template = options
+            .as_ref()
+            .and_then(|o| o.template.as_deref())
+            .unwrap_or("NewsStoryV1");
         let layout_mode = options
             .as_ref()
             .and_then(|o| o.layout_mode.as_deref())
@@ -78,6 +83,8 @@ fn start_render(
 
         cmd.arg("--preset")
             .arg(preset)
+            .arg("--template")
+            .arg(template)
             .arg("--layoutMode")
             .arg(layout_mode)
             .arg("--enableCallouts")
@@ -136,7 +143,7 @@ fn read_text_file(path: String) -> Result<String, String> {
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
     let output_root = workdir.join("output");
 
-    let output_root_canon = std::fs::canonicalize(&output_root).unwrap_or(output_root);
+    let output_root_canon = std::fs::canonicalize(&output_root).unwrap_or(output_root.clone());
     let file_canon = std::fs::canonicalize(&path).map_err(|e| format!("Không đọc được file: {e}"))?;
 
     if !file_canon.starts_with(&output_root_canon) {
@@ -151,11 +158,42 @@ fn read_text_file(path: String) -> Result<String, String> {
     std::fs::read_to_string(&file_canon).map_err(|e| format!("Không đọc được file: {e}"))
 }
 
+#[tauri::command]
+fn list_output_dirs() -> Result<Vec<String>, String> {
+    let workdir = std::env::current_dir()
+        .ok()
+        .and_then(|d| d.parent().map(|p| p.to_path_buf()))
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+    let output_root = workdir.join("output");
+
+    if !output_root.exists() || !output_root.is_dir() {
+        return Ok(vec![]);
+    }
+
+    let mut dirs = vec![];
+    let entries = std::fs::read_dir(&output_root).map_err(|e| format!("Không đọc được thư mục: {}", e))?;
+    for entry in entries.flatten() {
+        if let Ok(meta) = entry.metadata() {
+            if meta.is_dir() {
+                if let Some(name) = entry.file_name().to_str() {
+                    let path_str = entry.path().to_string_lossy().to_string();
+                    dirs.push(path_str);
+                }
+            }
+        }
+    }
+
+    // Sort by name descending
+    dirs.sort_by(|a, b| b.cmp(a));
+
+    Ok(dirs)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet, start_render, read_text_file])
+        .invoke_handler(tauri::generate_handler![greet, start_render, read_text_file, list_output_dirs])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

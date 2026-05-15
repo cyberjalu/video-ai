@@ -14,6 +14,10 @@ export async function readTextFileSafe(filePath: string) {
   return invoke<string>("read_text_file", { path: filePath });
 }
 
+export async function listOutputDirs() {
+  return invoke<string[]>("list_output_dirs");
+}
+
 export function toAssetSrc(filePath: string) {
   return convertFileSrc(filePath);
 }

@@ -1,11 +1,12 @@
 import { AlertTriangle, Clapperboard, Film } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { ArticlePreviewCard } from "../components/ArticlePreviewCard";
 import { GenerationStepper } from "../components/GenerationStepper";
 import { ScenePlanPanel } from "../components/ScenePlanPanel";
-import { InputModeCard, InputMode } from "../components/InputModeCard";
+import { InputModeCard, type InputMode } from "../components/InputModeCard";
 import { VideoPreviewCard } from "../components/VideoPreviewCard";
 import { EmptyState } from "../components/EmptyState";
+import { PageTransition } from "../components/PageTransition";
 import type { UiStep } from "../lib/generation";
 import type { GenerationStatus, VideoPlan } from "../lib/types";
 
@@ -71,7 +72,7 @@ export function CreateVideoPage({
   const showErrorPanel = status === "failed" && !!errorMessage;
 
   return (
-    <div className="mx-auto w-full max-w-[1260px]">
+    <PageTransition className="mx-auto w-full max-w-[1260px]">
       {/* Hero input — full width */}
       <InputModeCard
         inputMode={inputMode}
@@ -162,6 +163,6 @@ export function CreateVideoPage({
           )}
         </div>
       </div>
-    </div>
+    </PageTransition>
   );
 }

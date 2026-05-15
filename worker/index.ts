@@ -19,6 +19,7 @@ const ArgsSchema = z.object({
   tts: z.enum(["gemini", "openai", "macos"]).optional(),
   outDir: z.string().optional(),
   preset: z.enum(["deep_explainer", "news_60_80", "ultra_25_35"]).optional(),
+  template: z.string().optional(),
   layoutMode: z.enum(["tri", "dual", "mono"]).optional(),
   enableCallouts: z.boolean().optional(),
   enableProgress: z.boolean().optional(),
@@ -41,6 +42,7 @@ type LayoutMode = "tri" | "dual" | "mono";
 
 type RenderPrefs = {
   preset: RenderPreset;
+  template: string;
   layoutMode: LayoutMode;
   enableCallouts: boolean;
   enableProgress: boolean;
@@ -102,6 +104,7 @@ function parseArgs(argv: string[]) {
     tts: out.tts as "gemini" | "openai" | "macos" | undefined,
     outDir: out.outDir,
     preset: out.preset as RenderPreset | undefined,
+    template: out.template,
     layoutMode: out.layoutMode as LayoutMode | undefined,
     enableCallouts: parseBool(out.enableCallouts),
     enableProgress: parseBool(out.enableProgress),
@@ -112,6 +115,7 @@ function parseArgs(argv: string[]) {
 function toRenderPrefs(args: z.infer<typeof ArgsSchema>): RenderPrefs {
   return {
     preset: args.preset ?? "deep_explainer",
+    template: args.template ?? "NewsStoryV1",
     layoutMode: args.layoutMode ?? "tri",
     enableCallouts: args.enableCallouts ?? true,
     enableProgress: args.enableProgress ?? true,
@@ -924,8 +928,9 @@ async function renderRemotionVideo(
   });
 
   const comps = await getCompositions(serveUrl, { inputProps });
-  const comp = comps.find((c) => c.id === "NewsStoryV1");
-  if (!comp) throw new Error("Không tìm thấy composition NewsStoryV1.");
+  const targetCompId = prefs.template || "NewsStoryV1";
+  const comp = comps.find((c) => c.id === targetCompId);
+  if (!comp) throw new Error(`Không tìm thấy composition ${targetCompId}.`);
 
   const renderDir = path.join(projectDir, "render");
   await ensureDir(renderDir);

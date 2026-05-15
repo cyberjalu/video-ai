@@ -4,6 +4,8 @@ import { Badge } from "../components/Badge";
 import { PrimaryButton, SecondaryButton } from "../components/Buttons";
 import type { RenderOptions } from "../lib/types";
 
+import { PageTransition } from "../components/PageTransition";
+
 export function SettingsPage({
   geminiKey,
   onChangeGeminiKey,
@@ -24,7 +26,7 @@ export function SettingsPage({
   onSave: () => void;
 }) {
   return (
-    <div className="mx-auto w-full max-w-[980px] space-y-5">
+    <PageTransition className="mx-auto w-full max-w-[980px] space-y-5">
       <Card className="p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -58,11 +60,12 @@ export function SettingsPage({
             <input
               value={geminiKey}
               onChange={(e) => onChangeGeminiKey(e.currentTarget.value)}
-              className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-cyan-400/30"
+              className="rounded-lg border border-white/10 bg-black/30 px-4 py-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-cyan-400/50"
               placeholder="Paste your Gemini API key…"
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
+              type="password"
             />
             <div className="text-xs text-zinc-400">
               ClipNews AI never shows a built-in master key. Use your own key, or activate a license when available.
@@ -82,11 +85,12 @@ export function SettingsPage({
             <input
               value={licenseKey}
               onChange={(e) => onChangeLicenseKey(e.currentTarget.value)}
-              className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-cyan-400/30"
+              className="rounded-lg border border-white/10 bg-black/30 px-4 py-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-cyan-400/50"
               placeholder="XXXX-XXXX-XXXX…"
               autoCapitalize="characters"
               autoCorrect="off"
               spellCheck={false}
+              type="password"
             />
           </label>
           <div className="flex flex-wrap gap-2">
@@ -126,7 +130,7 @@ export function SettingsPage({
             <select
               value={options.voice ?? "Zephyr"}
               onChange={(e) => onChangeOptions({ ...options, voice: e.currentTarget.value })}
-              className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-cyan-400/30"
+              className="rounded-lg border border-white/10 bg-black/30 px-4 py-3 text-sm text-zinc-200 focus:outline-none focus:border-cyan-400/50"
             >
               <option value="Achernar">Achernar – Soft</option>
               <option value="Achird">Achird – Friendly</option>
@@ -207,7 +211,7 @@ export function SettingsPage({
           </PrimaryButton>
         </div>
       </Card>
-    </div>
+    </PageTransition>
   );
 }
 

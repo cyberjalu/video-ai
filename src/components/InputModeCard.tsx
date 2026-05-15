@@ -38,14 +38,12 @@ export function InputModeCard({
   }
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-zinc-900/70 shadow-card backdrop-blur">
-      {/* Subtle gradient wash */}
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-violet-600/10 via-transparent to-cyan-500/8" />
-      {/* Grid texture */}
-      <div className="pointer-events-none absolute inset-0 opacity-50 [mask-image:radial-gradient(600px_circle_at_15%_0%,black,transparent_60%)] bg-hero-grid bg-grid-40" />
+    <div className="relative overflow-hidden rounded-xl border border-white/[0.08] bg-[#101014] shadow-sm">
+      {/* Subtle grid texture for visual interest */}
+      <div className="pointer-events-none absolute inset-0 opacity-[0.15] [mask-image:radial-gradient(400px_circle_at_50%_0%,black,transparent_60%)] bg-hero-grid bg-grid-40" />
 
-      {/* Glow border highlight at top */}
-      <div className="pointer-events-none absolute left-0 right-0 top-0 h-px bg-gradient-to-r from-transparent via-violet-400/40 to-transparent" />
+      {/* Top border glow indicator */}
+      <div className="pointer-events-none absolute left-0 right-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-400/30 to-transparent" />
 
       <div className="relative p-6">
         {/* Header & Tabs */}
@@ -98,7 +96,7 @@ export function InputModeCard({
               <span className="sr-only">Article URL</span>
               <div
                 className={cn(
-                  "flex items-center gap-3 rounded-2xl border bg-black/40 px-4 py-3.5 transition-all",
+                  "flex items-center gap-3 rounded-lg border bg-[#09090b] px-5 py-4 transition-all",
                   error
                     ? "border-red-400/40 ring-2 ring-red-400/10"
                     : disabled
@@ -136,7 +134,7 @@ export function InputModeCard({
               <span className="sr-only">Text Prompt</span>
               <div
                 className={cn(
-                  "flex items-start gap-3 rounded-2xl border bg-black/40 px-4 py-3.5 transition-all",
+                  "flex items-start gap-3 rounded-lg border bg-[#09090b] px-5 py-4 transition-all",
                   error
                     ? "border-red-400/40 ring-2 ring-red-400/10"
                     : disabled
