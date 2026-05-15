@@ -9,15 +9,16 @@ export function PrimaryButton({ className, isLoading, children, ...props }: Butt
   return (
     <button
       className={cn(
-        "relative inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-500 px-5 py-3 text-sm font-semibold text-cyan-950 transition-all hover:bg-cyan-400 hover:shadow-[0_0_15px_rgba(34,211,238,0.25)] disabled:cursor-not-allowed disabled:opacity-50",
+        "relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-2xl border border-cyan-300/20 bg-linear-[180deg,#7ce3f8_0%,#48c8ec_52%,#2f9ec5_100%] px-5 py-3 text-sm font-bold text-slate-950 shadow-[0_1px_0_rgba(255,255,255,0.45)_inset,0_12px_30px_rgba(44,167,203,0.28)] transition-all duration-200 hover:-translate-y-px hover:shadow-[0_1px_0_rgba(255,255,255,0.45)_inset,0_18px_40px_rgba(44,167,203,0.36)] active:translate-y-0 active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50",
         className,
       )}
       {...props}
     >
+      <span className="pointer-events-none absolute inset-0 signal-sweep bg-[linear-gradient(110deg,transparent_0%,rgba(255,255,255,0.08)_45%,rgba(255,255,255,0.36)_50%,rgba(255,255,255,0.06)_56%,transparent_100%)]" />
       {isLoading ? (
-        <span className="h-4 w-4 animate-spin rounded-full border-2 border-cyan-950/30 border-t-cyan-950" />
+        <span className="relative h-4 w-4 animate-spin rounded-full border-2 border-slate-950/20 border-t-slate-950" />
       ) : null}
-      {children}
+      <span className="relative">{children}</span>
     </button>
   );
 }
@@ -26,7 +27,7 @@ export function SecondaryButton({ className, children, ...props }: React.ButtonH
   return (
     <button
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-zinc-300 transition-all hover:bg-white/10 hover:text-zinc-100 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex items-center justify-center gap-2 rounded-2xl border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.025))] px-4 py-3 text-sm font-medium text-zinc-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-all duration-200 hover:-translate-y-px hover:border-white/[0.14] hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.04))] hover:text-zinc-100 active:translate-y-0 active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50",
         className,
       )}
       {...props}

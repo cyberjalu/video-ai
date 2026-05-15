@@ -2,13 +2,20 @@ import type React from "react";
 import { cn } from "../lib/cn";
 
 export function Card({
+  variant = "default",
   className,
   ...props
-}: React.HTMLAttributes<HTMLDivElement>) {
+}: React.HTMLAttributes<HTMLDivElement> & { variant?: "default" | "strong" | "inset" }) {
+  const variants = {
+    default: "surface-panel rounded-[var(--app-radius-lg)]",
+    strong: "surface-panel-strong rounded-[var(--app-radius-lg)]",
+    inset: "surface-inset rounded-[var(--app-radius-md)]",
+  } as const;
+
   return (
     <div
       className={cn(
-        "rounded-xl border border-white/[0.08] bg-[#101014] shadow-sm",
+        variants[variant],
         className,
       )}
       {...props}

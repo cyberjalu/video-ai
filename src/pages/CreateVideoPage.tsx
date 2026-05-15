@@ -1,5 +1,5 @@
-import { AlertTriangle, Clapperboard, Film } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { AlertTriangle, Clapperboard, Play } from "lucide-react";
+import { motion } from "framer-motion";
 import { ArticlePreviewCard } from "../components/ArticlePreviewCard";
 import { GenerationStepper } from "../components/GenerationStepper";
 import { ScenePlanPanel } from "../components/ScenePlanPanel";
@@ -9,6 +9,31 @@ import { EmptyState } from "../components/EmptyState";
 import { PageTransition } from "../components/PageTransition";
 import type { UiStep } from "../lib/generation";
 import type { GenerationStatus, VideoPlan } from "../lib/types";
+
+function VideoPlaceholder() {
+  return (
+    <div className="flex h-full min-h-[260px] flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-white/[0.12] bg-white/[0.02] p-6">
+      {/* Phone frame outline */}
+      <div
+        className="relative flex items-center justify-center rounded-[18px] border border-white/[0.13] bg-[#0d0d10]"
+        style={{ width: 88, height: 156 }}
+      >
+        {/* Notch */}
+        <div className="absolute top-2.5 left-1/2 -translate-x-1/2 h-1.5 w-7 rounded-full bg-white/10" />
+        {/* Play icon */}
+        <div className="grid h-8 w-8 place-items-center rounded-full border border-white/10 bg-white/[0.06] text-zinc-600">
+          <Play className="h-3.5 w-3.5 ml-0.5" />
+        </div>
+        {/* Bottom home indicator */}
+        <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 h-1 w-7 rounded-full bg-white/10" />
+      </div>
+      <div className="text-center">
+        <div className="text-sm font-semibold text-zinc-400">Video preview</div>
+        <div className="mt-0.5 text-xs text-zinc-600">Will appear here once generated</div>
+      </div>
+    </div>
+  );
+}
 
 export function CreateVideoPage({
   inputMode,
@@ -89,9 +114,9 @@ export function CreateVideoPage({
       />
 
       {/* 2-column layout */}
-      <div className="mt-8 grid gap-6 xl:grid-cols-12">
+      <div className="mt-8 grid gap-6 lg:grid-cols-12">
         {/* Left column: progress + article + scenes */}
-        <div className="space-y-6 xl:col-span-7">
+        <div className="space-y-6 lg:col-span-7">
           {showProgress ? (
             <motion.div
               initial={{ opacity: 0, y: 8 }}
@@ -141,7 +166,7 @@ export function CreateVideoPage({
         </div>
 
         {/* Right column: video preview */}
-        <div className="xl:col-span-5">
+        <div className="lg:col-span-5 h-full">
           {mp4Path ? (
             <VideoPreviewCard
               title={plan?.title ?? articleTitle ?? undefined}
@@ -155,11 +180,7 @@ export function CreateVideoPage({
               onCopyCaption={onCopyCaption}
             />
           ) : (
-            <EmptyState
-              title="Video preview will appear here"
-              description="Your rendered TikTok video will be playable and downloadable once generation completes."
-              icon={<Film className="h-4 w-4" />}
-            />
+            <VideoPlaceholder />
           )}
         </div>
       </div>

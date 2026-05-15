@@ -125,11 +125,7 @@ const CalloutChips: React.FC<{ items: string[]; frame: number; enabled: boolean 
           extrapolateLeft: "clamp",
           extrapolateRight: "clamp",
         });
-        const scale = interpolate(local, [0, 8], [0.94, 1], {
-          extrapolateLeft: "clamp",
-          extrapolateRight: "clamp",
-        });
-        returntranslateY = interpolate(local, [0, 8], [20, 0], {
+        const translateY = interpolate(local, [0, 8], [20, 0], {
           extrapolateLeft: "clamp",
           extrapolateRight: "clamp",
         });
@@ -146,7 +142,12 @@ const CalloutChips: React.FC<{ items: string[]; frame: number; enabled: boolean 
               color: "#e2e8f0",
               fontSize: 26,
               fontWeight: 600,
-              boxShadow: "0 8px 16px rgba(0,0,0,0.4
+              boxShadow: "0 8px 16px rgba(0,0,0,0.4)",
+              backdropFilter: "blur(8px)",
+            }}
+          >
+            {item}
+          </div>
         );
       })}
     </div>

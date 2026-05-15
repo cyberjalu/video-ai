@@ -120,7 +120,12 @@ fn start_render(
 
         match child.wait() {
             Ok(status) => {
-                let _ = app.emit("render_done", status.code().unwrap_or(-1));
+                if status.success() {
+                    let _ = app.emit("render_done", status.code().unwrap_or(0));
+                } else {
+                    let code = status.code().unwrap_or(-1);
+                    let _ = app.emit("render_error", format!("Worker thoat voi ma loi {code}"));
+                }
             }
             Err(e) => {
                 let _ = app.emit("render_error", format!("Worker lỗi: {e}"));

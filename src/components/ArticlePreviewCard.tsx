@@ -30,15 +30,18 @@ export function ArticlePreviewCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
     >
-      <Card className="p-5">
+      <Card className="p-6">
         {/* Header */}
         <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-500">
-            <FileText className="h-3.5 w-3.5" />
-            Detected article
+          <div>
+            <div className="eyebrow-label mb-2 flex items-center gap-2">
+              <FileText className="h-3.5 w-3.5" />
+              Editorial Brief
+            </div>
+            <div className="display-title text-[24px] leading-none text-zinc-100">Source intake recognized</div>
           </div>
           {source ? (
-            <Badge className="shrink-0 gap-1">
+            <Badge variant="muted" className="shrink-0 gap-1 text-[9px]">
               <Globe className="h-3 w-3" />
               {source}
             </Badge>
@@ -46,13 +49,13 @@ export function ArticlePreviewCard({
         </div>
 
         {/* Title */}
-        <div className="mt-3 text-sm font-semibold leading-snug text-zinc-100 line-clamp-3">{title}</div>
+        <div className="mt-4 text-base font-semibold leading-7 text-zinc-100 line-clamp-3">{title}</div>
 
         {/* Stats grid */}
-        <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="mt-5 grid grid-cols-2 gap-3">
           {/* Word count / length */}
-          <div className="rounded-xl border border-white/[0.06] bg-black/25 px-3 py-2.5">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-600">Length</div>
+          <div className="surface-inset rounded-[20px] px-4 py-3">
+            <div className="eyebrow-label">Length</div>
             <div className={`mt-1 text-sm font-bold ${bucket?.color ?? "text-zinc-300"}`}>
               {bucket ? bucket.label : "—"}
             </div>
@@ -63,8 +66,8 @@ export function ArticlePreviewCard({
           </div>
 
           {/* Video plan */}
-          <div className="rounded-xl border border-white/[0.06] bg-black/25 px-3 py-2.5">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-600">Plan</div>
+          <div className="surface-inset rounded-[20px] px-4 py-3">
+            <div className="eyebrow-label">Plan</div>
             <div className="mt-1 text-sm font-bold text-zinc-200">
               {suggestedScenes ? `${suggestedScenes} scenes` : "—"}
               {suggestedDurationSec ? (

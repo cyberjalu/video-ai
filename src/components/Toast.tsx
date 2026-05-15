@@ -51,16 +51,18 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               exit={{ opacity: 0, y: -10, scale: 0.98 }}
               transition={{ duration: 0.18, ease: "easeOut" }}
               className={cn(
-                "pointer-events-auto rounded-2xl border px-4 py-3 shadow-[0_20px_60px_rgba(0,0,0,0.6)] backdrop-blur",
+                "pointer-events-auto relative overflow-hidden rounded-[22px] border px-4 py-3 shadow-[0_20px_60px_rgba(0,0,0,0.6)] backdrop-blur-xl",
                 t.variant === "success"
-                  ? "border-emerald-400/20 bg-emerald-400/10"
+                  ? "border-emerald-400/20 bg-[linear-gradient(180deg,rgba(64,211,159,0.18),rgba(64,211,159,0.08))]"
                   : t.variant === "error"
-                    ? "border-red-400/20 bg-red-400/10"
-                    : "border-white/10 bg-zinc-900/70",
+                    ? "border-red-400/20 bg-[linear-gradient(180deg,rgba(241,111,114,0.18),rgba(241,111,114,0.08))]"
+                    : "border-white/10 bg-[linear-gradient(180deg,rgba(20,23,29,0.92),rgba(12,14,18,0.92))]",
               )}
             >
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/35 to-transparent" />
+              <div className="eyebrow-label mb-1">{t.variant === "success" ? "Success" : t.variant === "error" ? "Alert" : "System"}</div>
               <div className="text-sm font-semibold text-zinc-100">{t.title}</div>
-              {t.description ? <div className="mt-1 text-sm text-zinc-300">{t.description}</div> : null}
+              {t.description ? <div className="mt-1 text-sm leading-6 text-zinc-300">{t.description}</div> : null}
             </motion.div>
           ))}
         </AnimatePresence>

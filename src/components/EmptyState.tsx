@@ -1,6 +1,5 @@
 import type React from "react";
 import { cn } from "../lib/cn";
-import { Card } from "./Card";
 
 export function EmptyState({
   title,
@@ -16,21 +15,24 @@ export function EmptyState({
   children?: React.ReactNode;
 }) {
   return (
-    <Card className={cn("p-6", className)}>
-      <div className="flex items-start gap-4">
-        {icon && (
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/8 bg-white/4 text-zinc-500">
-            {icon}
-          </div>
-        )}
-        <div className="min-w-0 flex-1 pt-0.5">
-          <div className="text-sm font-semibold text-zinc-300">{title}</div>
-          {description ? (
-            <div className="mt-1 text-sm leading-relaxed text-zinc-600">{description}</div>
-          ) : null}
-          {children ? <div className="mt-4">{children}</div> : null}
+    <div
+      className={cn(
+        "flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-white/[0.12] bg-white/[0.02] px-6 py-10 text-center",
+        className,
+      )}
+    >
+      {icon && (
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/5 text-zinc-500">
+          {icon}
         </div>
+      )}
+      <div>
+        <div className="text-sm font-semibold text-zinc-400">{title}</div>
+        {description ? (
+          <div className="mt-1 max-w-[280px] text-xs leading-relaxed text-zinc-600">{description}</div>
+        ) : null}
       </div>
-    </Card>
+      {children ? <div className="mt-2">{children}</div> : null}
+    </div>
   );
 }

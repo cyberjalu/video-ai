@@ -1,0 +1,78 @@
+- generic [ref=e4]:
+  - generic [ref=e6]:
+    - generic [ref=e9]:
+      - img [ref=e11]
+      - generic [ref=e13]:
+        - generic [ref=e14]:
+          - generic [ref=e15]: ClipNews AI
+          - generic [ref=e16]: Beta
+        - generic [ref=e17]: News → TikTok in seconds
+    - navigation [ref=e18]:
+      - generic [ref=e19]:
+        - button "Create Video" [ref=e20] [cursor=pointer]:
+          - img [ref=e23]
+          - generic [ref=e26]: Create Video
+        - button "History" [ref=e27] [cursor=pointer]:
+          - img [ref=e29]
+          - generic [ref=e33]: History
+        - button "Templates" [ref=e34] [cursor=pointer]:
+          - img [ref=e36]
+          - generic [ref=e40]: Templates
+        - button "Settings" [ref=e41] [cursor=pointer]:
+          - img [ref=e43]
+          - generic [ref=e46]: Settings
+    - generic [ref=e48]:
+      - generic [ref=e49]:
+        - generic [ref=e50]: License
+        - generic [ref=e51]: Trial
+      - generic [ref=e52]:
+        - generic [ref=e53]: Version
+        - generic [ref=e54]: v0.1.0
+  - generic [ref=e55]:
+    - generic [ref=e58]:
+      - generic [ref=e60]: Create Video
+      - generic [ref=e61]: Ready
+    - generic [ref=e67]:
+      - generic [ref=e69]:
+        - generic [ref=e70]:
+          - generic [ref=e71]:
+            - generic [ref=e72]: Create TikTok Video
+            - generic [ref=e73]: from article URL
+          - generic [ref=e74]:
+            - button "Article URL" [ref=e75]:
+              - img [ref=e76]
+              - text: Article URL
+            - button "Text Prompt" [ref=e79]:
+              - img [ref=e80]
+              - text: Text Prompt
+        - generic [ref=e83]:
+          - generic [ref=e84]:
+            - generic [ref=e85]: Article URL
+            - generic [ref=e86]:
+              - img [ref=e87]
+              - textbox "Article URL" [ref=e90]:
+                - /placeholder: https://techcrunch.com/2026/...
+                - text: https://openai.com/index/gpt-5-5-with-trusted-access-for-cyber/
+          - generic [ref=e91]:
+            - button "Create Video" [ref=e92]
+            - button "Paste from clipboard" [ref=e93]:
+              - img [ref=e94]
+              - generic [ref=e97]: Paste
+        - generic [ref=e98]: Works best with news articles, blog posts, and press releases.
+      - generic [ref=e99]:
+        - generic [ref=e100]:
+          - generic [ref=e101]:
+            - img [ref=e103]
+            - generic [ref=e108]:
+              - generic [ref=e109]: Ready when you are
+              - generic [ref=e110]: Enter a news URL or a text prompt. We'll extract content, write the script, record voiceover, and render your TikTok video automatically.
+          - generic [ref=e111]:
+            - img [ref=e113]
+            - generic [ref=e117]:
+              - generic [ref=e118]: Scene plan will be generated automatically
+              - generic [ref=e119]: We’ll break the article into a hook, proof, key facts, and a closing CTA.
+        - generic [ref=e121]:
+          - img [ref=e124]
+          - generic [ref=e126]:
+            - generic [ref=e127]: Video preview
+            - generic [ref=e128]: Will appear here once generated

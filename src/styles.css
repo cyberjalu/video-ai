@@ -1,6 +1,28 @@
 /* Tailwind v4 pre-generated CSS (run: node generate-tailwind.cjs to regenerate) */
 @import "./tailwind-generated.css";
 
+:root {
+  --app-bg: #07080a;
+  --app-panel: rgba(15, 16, 20, 0.9);
+  --app-panel-strong: rgba(19, 21, 27, 0.96);
+  --app-panel-soft: rgba(255, 255, 255, 0.035);
+  --app-line: rgba(255, 255, 255, 0.08);
+  --app-line-strong: rgba(255, 255, 255, 0.14);
+  --app-text: #eef2f7;
+  --app-text-muted: #a4afbf;
+  --app-text-faint: #637084;
+  --app-accent: #63d6f3;
+  --app-accent-soft: rgba(99, 214, 243, 0.15);
+  --app-success: #40d39f;
+  --app-danger: #f16f72;
+  --app-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+  --app-shadow-card: 0 18px 48px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  --app-radius-lg: 22px;
+  --app-radius-md: 16px;
+  --font-ui: "Montserrat", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Newsreader", ui-serif, Georgia, serif;
+}
+
 @layer base {
   html,
   body,
@@ -12,33 +34,49 @@
   }
 
   body {
-    background-color: var(--color-zinc-950, #09090b);
-    color: var(--color-zinc-100, #f4f4f5);
-    font-family: ui-sans-serif, system-ui, sans-serif;
+    background:
+      radial-gradient(circle at top left, rgba(99, 214, 243, 0.08), transparent 26%),
+      radial-gradient(circle at 82% 12%, rgba(77, 130, 255, 0.08), transparent 22%),
+      linear-gradient(180deg, #0a0b0f 0%, var(--app-bg) 100%);
+    color: var(--app-text);
+    font-family: var(--font-ui);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     font-feature-settings: "rlig" 1, "calt" 1;
+    letter-spacing: -0.01em;
+  }
+
+  h1,
+  h2,
+  h3,
+  [data-display="true"] {
+    font-family: var(--font-display);
+    letter-spacing: -0.03em;
   }
 
   /* Custom scrollbar */
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 10px;
+    height: 10px;
   }
   ::-webkit-scrollbar-track {
-    background: transparent;
+    background: rgba(255, 255, 255, 0.02);
   }
   ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.12);
+    background: linear-gradient(180deg, rgba(148, 163, 184, 0.26), rgba(99, 214, 243, 0.18));
+    border: 2px solid transparent;
+    background-clip: padding-box;
     border-radius: 100px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.22);
+    background: linear-gradient(180deg, rgba(148, 163, 184, 0.38), rgba(99, 214, 243, 0.28));
+    border: 2px solid transparent;
+    background-clip: padding-box;
   }
 
   /* Better focus styles */
   *:focus-visible {
-    outline: 2px solid rgba(139, 92, 246, 0.6);
+    outline: 2px solid rgba(99, 214, 243, 0.65);
     outline-offset: 2px;
     border-radius: 8px;
   }
@@ -56,6 +94,18 @@
   100% { background-position: 200% center; }
 }
 
+@keyframes signalSweep {
+  0% { transform: translateX(-110%); opacity: 0; }
+  15% { opacity: 0.15; }
+  50% { opacity: 0.5; }
+  100% { transform: translateX(180%); opacity: 0; }
+}
+
+@keyframes ambientBreathe {
+  0%, 100% { opacity: 0.48; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.04); }
+}
+
 .shimmer {
   background: linear-gradient(
     90deg,
@@ -65,6 +115,14 @@
   );
   background-size: 200% 100%;
   animation: shimmer 1.8s ease-in-out infinite;
+}
+
+.signal-sweep {
+  animation: signalSweep 2.6s linear infinite;
+}
+
+.ambient-breathe {
+  animation: ambientBreathe 5.5s ease-in-out infinite;
 }
 
 /* Custom design tokens from tailwind.config.cjs */
@@ -92,7 +150,38 @@
 }
 
 .shadow-card {
-  box-shadow: 0 18px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.05);
+  box-shadow: var(--app-shadow-card);
+}
+
+.surface-panel {
+  background: var(--app-panel);
+  border: 1px solid var(--app-line);
+  box-shadow: var(--app-shadow-card);
+}
+
+.surface-panel-strong {
+  background: var(--app-panel-strong);
+  border: 1px solid var(--app-line-strong);
+  box-shadow: var(--app-shadow);
+}
+
+.surface-inset {
+  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.eyebrow-label {
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--app-text-faint);
+}
+
+.display-title {
+  font-family: var(--font-display);
+  letter-spacing: -0.035em;
 }
 
 /* Extra opacity utilities for bg-white/6 and bg-white/8 */
@@ -107,3 +196,23 @@
 /* Force pointer-events utilities in case generator misses them */
 .pointer-events-none { pointer-events: none !important; }
 .pointer-events-auto { pointer-events: auto !important; }
+
+/* sr-only: visually hidden but accessible */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Responsive grid layout for CreateVideoPage (Tailwind v4 generator misses responsive variants) */
+@media (min-width: 1024px) {
+  .lg\:grid-cols-12 { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+  .lg\:col-span-7 { grid-column: span 7 / span 7; }
+  .lg\:col-span-5 { grid-column: span 5 / span 5; }
+}
