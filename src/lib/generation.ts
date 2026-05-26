@@ -20,7 +20,7 @@ export type UiStep = {
 export const UI_STEP_ORDER: Array<{ id: UiStepId; label: string; worker: WorkerStep[] }> = [
   { id: "reading_article", label: "Reading article", worker: ["extract"] },
   { id: "capturing_screenshots", label: "Capturing screenshots", worker: ["screenshot"] },
-  { id: "writing_script", label: "Writing video script", worker: ["plan", "plan_rewrite"] },
+  { id: "writing_script", label: "Writing video script", worker: ["plan", "plan_rewrite", "fetch_broll"] },
   { id: "generating_voiceover", label: "Generating voiceover", worker: ["tts", "audio_fit"] },
   { id: "rendering_video", label: "Rendering video", worker: ["render"] },
   { id: "finalizing_export", label: "Finalizing export", worker: ["qc"] },

@@ -23,6 +23,7 @@ fn start_render(
     url: Option<String>,
     prompt: Option<String>,
     gemini_api_key: String,
+    pexels_api_key: Option<String>,
     options: Option<RenderOptions>,
 ) -> Result<(), String> {
     let url = url.unwrap_or_default();
@@ -74,6 +75,13 @@ fn start_render(
             .env("GEMINI_API_KEY", gemini_api_key)
             .arg("./node_modules/.bin/tsx")
             .arg("./worker/index.ts");
+
+        if let Some(ref pexels_key) = pexels_api_key {
+            if !pexels_key.trim().is_empty() {
+                cmd.env("PEXELS_API_KEY", pexels_key);
+                cmd.arg("--pexelsKey").arg(pexels_key);
+            }
+        }
 
         if !url.trim().is_empty() {
             cmd.arg("--url").arg(url);

@@ -15,6 +15,7 @@ const ArgsSchema = z.object({
   prompt: z.string().optional(),
   geminiKey: z.string().optional(),
   openaiKey: z.string().optional(),
+  pexelsKey: z.string().optional(),
   planFile: z.string().optional(),
   tts: z.enum(["gemini", "openai", "macos"]).optional(),
   outDir: z.string().optional(),
@@ -36,7 +37,7 @@ type SceneRole =
   | "impact"
   | "takeaway";
 
-type SceneLayout = "screenshot" | "big_callout" | "split";
+type SceneLayout = "screenshot" | "big_callout" | "split" | "broll";
 type RenderPreset = "deep_explainer" | "news_60_80" | "ultra_25_35";
 type LayoutMode = "tri" | "dual" | "mono";
 
@@ -60,9 +61,11 @@ const VideoPlanSchema = z.object({
         duration_sec: z.number().int().min(3).max(14),
         caption_lines: z.array(z.string()).min(1).max(2),
         voiceover: z.string(),
-        layout: z.enum(["screenshot", "big_callout", "split"]).optional(),
+        layout: z.enum(["screenshot", "big_callout", "split", "broll"]).optional(),
         callouts: z.array(z.string()).max(2).optional(),
         screenshot_path: z.string().optional(),
+        pexels_query: z.string().optional(),
+        broll_path: z.string().optional(),
       }),
     )
     .min(4)
@@ -100,6 +103,7 @@ function parseArgs(argv: string[]) {
     prompt: out.prompt,
     geminiKey: out.geminiKey ?? process.env.GEMINI_API_KEY,
     openaiKey: out.openaiKey ?? process.env.OPENAI_API_KEY,
+    pexelsKey: out.pexelsKey ?? process.env.PEXELS_API_KEY,
     planFile: out.planFile,
     tts: out.tts as "gemini" | "openai" | "macos" | undefined,
     outDir: out.outDir,
@@ -141,6 +145,48 @@ async function ensureDir(p: string) {
 
 async function writeJson(p: string, v: unknown) {
   await fs.writeFile(p, JSON.stringify(v, null, 2), "utf-8");
+}
+
+async function fetchPexelsVideo(query: string, pexelsKey: string, outPath: string): Promise<string> {
+  const url = `https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&per_page=1&orientation=portrait`;
+  const response = await fetch(url, {
+    headers: {
+      Authorization: pexelsKey,
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => "");
+    throw new Error(`Pexels API error: HTTP ${response.status} ${errorText.slice(0, 300)}`);
+  }
+
+  const data = (await response.json()) as any;
+  const video = data?.videos?.[0];
+  if (!video) {
+    throw new Error(`No videos found on Pexels for query: "${query}"`);
+  }
+
+  const videoFiles = video.video_files || [];
+  const mp4Files = videoFiles.filter((f: any) => f.file_type === "video/mp4" || f.link.includes(".mp4"));
+  if (mp4Files.length === 0) {
+    throw new Error(`No mp4 files found for Pexels video: ${video.id}`);
+  }
+
+  const hdFile = mp4Files.find((f: any) => f.quality === "hd");
+  const chosenFile = hdFile || mp4Files[0];
+  const downloadUrl = chosenFile.link;
+
+  const videoRes = await fetch(downloadUrl);
+  if (!videoRes.ok) {
+    throw new Error(`Failed to download Pexels video: HTTP ${videoRes.status}`);
+  }
+
+  const arrayBuffer = await videoRes.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+  await ensureDir(path.dirname(outPath));
+  await fs.writeFile(outPath, buffer);
+
+  return outPath;
 }
 
 async function extractArticle(url: string, projectDir: string) {
@@ -407,10 +453,10 @@ function buildPlanPrompt(articleText: string, title: string, prefs: RenderPrefs)
     : "- Để callouts là mảng rỗng [].";
   const layoutRule =
     prefs.layoutMode === "tri"
-      ? "- layout luân phiên 3 kiểu: screenshot, big_callout, split; không lặp quá 2 scene liên tiếp."
+      ? "- layout luân phiên các kiểu: screenshot, big_callout, split, broll; không lặp quá 2 scene liên tiếp. Chọn broll cho các scene phù hợp với video minh họa nền (B-roll)."
       : prefs.layoutMode === "dual"
-        ? "- layout chỉ dùng screenshot và big_callout, luân phiên để tránh đều đều."
-        : "- layout dùng screenshot cho tất cả scene.";
+        ? "- layout dùng screenshot, big_callout và broll luân phiên để tránh đều đều."
+        : "- layout dùng screenshot hoặc broll cho tất cả scene.";
 
   return `Bạn là biên tập viên video TikTok tiếng Việt dạng explainer về an ninh mạng.
 Mục tiêu: giữ retention cao, dễ hiểu, không bịa, chỉ dựa vào nội dung đầu vào.
@@ -427,8 +473,9 @@ Trả về JSON theo schema:
       "duration_sec": number (3-14),
       "caption_lines": [string, string?],
       "voiceover": "string (ví dụ: [excitedly] Chào các bạn!)",
-      "layout": "screenshot|big_callout|split",
-      "callouts": [string, string?]
+      "layout": "screenshot|big_callout|split|broll",
+      "callouts": [string, string?],
+      "pexels_query": "string (1-3 từ khóa tiếng Anh cực kỳ ngắn gọn và chính xác để tìm video B-roll minh họa, ví dụ: 'hacker', 'server room', 'frustrated man'. BẮT BUỘC phải có nếu layout là 'broll')"
     }
   ]
 }
@@ -529,8 +576,9 @@ Trả về JSON theo schema:
       "duration_sec": number (5-12),
       "caption_lines": [string, string?],
       "voiceover": "string (ví dụ: [excitedly] Chào các bạn!)",
-      "layout": "big_callout|split",
-      "callouts": [string, string?]
+      "layout": "big_callout|split|broll",
+      "callouts": [string, string?],
+      "pexels_query": "string (1-3 từ khóa tiếng Anh cực kỳ ngắn gọn và chính xác để tìm video B-roll minh họa, ví dụ: 'hacker', 'sad person'. BẮT BUỘC phải có nếu layout là 'broll')"
     }
   ]
 }
@@ -895,10 +943,12 @@ async function renderRemotionVideo(
     plan.scenes.map(async (s) => {
       const shotPath = roleToShot[s.role as SceneRole] ?? screenshotMeta.headline?.path;
       const screenshot_src = shotPath ? await fileToDataUrl(shotPath, "image/png") : undefined;
+      const broll_src = s.broll_path ? await fileToDataUrl(s.broll_path, "video/mp4") : undefined;
       return {
         ...s,
         screenshot_path: shotPath,
         screenshot_src,
+        broll_src,
         layout: s.layout ?? "screenshot",
         callouts: s.callouts ?? [],
       };
@@ -1069,6 +1119,44 @@ async function main() {
       }
     } else {
       throw new Error("Phải cung cấp --url hoặc --prompt.");
+    }
+
+    // Fetch B-roll videos if any scenes use layout: "broll" and we have pexelsKey
+    const brollScenes = plan.scenes.filter((s) => s.layout === "broll" && s.pexels_query);
+    if (brollScenes.length > 0) {
+      if (args.pexelsKey) {
+        emit({ type: "step_start", step: "fetch_broll", count: brollScenes.length });
+        const brollsDir = path.join(baseOut, "brolls");
+        await ensureDir(brollsDir);
+
+        for (const scene of brollScenes) {
+          const query = scene.pexels_query!;
+          const outPath = path.join(brollsDir, `scene_${scene.id}.mp4`);
+          emit({ type: "log", step: "fetch_broll", message: `Fetching Pexels B-roll for scene ${scene.id} with query: "${query}"` });
+          try {
+            await fetchPexelsVideo(query, args.pexelsKey, outPath);
+            scene.broll_path = outPath;
+            emit({ type: "log", step: "fetch_broll", message: `Successfully downloaded B-roll for scene ${scene.id}: ${outPath}` });
+          } catch (e) {
+            emit({
+              type: "log",
+              step: "fetch_broll",
+              message: `Failed to download B-roll for scene ${scene.id}: ${e instanceof Error ? e.message : String(e)}. Fallback to big_callout.`,
+            });
+            scene.layout = "big_callout";
+          }
+        }
+        emit({ type: "step_done", step: "fetch_broll" });
+      } else {
+        emit({
+          type: "log",
+          step: "fetch_broll",
+          message: "Warning: Pexels API key not provided, falling back all broll scenes to big_callout layout.",
+        });
+        for (const scene of brollScenes) {
+          scene.layout = "big_callout";
+        }
+      }
     }
 
     const audioPathRaw = path.join(baseOut, "tts", "voiceover.raw.wav");

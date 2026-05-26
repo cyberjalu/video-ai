@@ -20,9 +20,11 @@ import {
 } from "./lib/generation";
 import {
   loadGeminiKey,
+  loadPexelsKey,
   loadLicenseKey,
   loadRenderOptions,
   saveGeminiKey,
+  savePexelsKey,
   saveLicenseKey,
   saveRenderOptions,
 } from "./lib/storage";
@@ -46,18 +48,21 @@ function AppInner() {
 
   // ─── Persistent Settings ─────────────────────────────────────────────────────
   const [geminiKey, setGeminiKey] = useState("");
+  const [pexelsKey, setPexelsKey] = useState("");
   const [licenseKey, setLicenseKey] = useState("");
   const [options, setOptions] = useState<RenderOptions>(loadRenderOptions());
   const licenseStatus: "Activated" | "Trial" | "Locked" = licenseKey ? "Activated" : "Trial";
 
   useEffect(() => {
     setGeminiKey(loadGeminiKey());
+    setPexelsKey(loadPexelsKey());
     setLicenseKey(loadLicenseKey());
     setOptions(loadRenderOptions());
   }, []);
 
   function handleSaveSettings() {
     saveGeminiKey(geminiKey);
+    savePexelsKey(pexelsKey);
     saveLicenseKey(licenseKey);
     saveRenderOptions(options);
     toast({ title: "Settings saved", variant: "success" });
@@ -339,6 +344,7 @@ function AppInner() {
         url: inputMode === "url" ? url : undefined,
         prompt: inputMode === "prompt" ? promptText : undefined,
         geminiApiKey: key,
+        pexelsApiKey: pexelsKey,
         options,
       });
     } catch (e) {
@@ -455,6 +461,8 @@ function AppInner() {
             <SettingsPage
               geminiKey={geminiKey}
               onChangeGeminiKey={setGeminiKey}
+              pexelsKey={pexelsKey}
+              onChangePexelsKey={setPexelsKey}
               licenseKey={licenseKey}
               onChangeLicenseKey={setLicenseKey}
               licenseStatus={licenseStatus}

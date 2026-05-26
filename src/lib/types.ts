@@ -38,6 +38,7 @@ export type WorkerStep =
   | "extract"
   | "screenshot"
   | "plan"
+  | "fetch_broll"
   | "tts"
   | "audio_fit"
   | "plan_rewrite"
@@ -60,9 +61,11 @@ export type VideoPlan = {
     duration_sec: number;
     caption_lines: string[];
     voiceover: string;
-    layout?: "screenshot" | "big_callout" | "split";
+    layout?: "screenshot" | "big_callout" | "split" | "broll";
     callouts?: string[];
     screenshot_path?: string;
+    pexels_query?: string;
+    broll_path?: string;
   }>;
 };
 

@@ -9,6 +9,8 @@ import { PageTransition } from "../components/PageTransition";
 export function SettingsPage({
   geminiKey,
   onChangeGeminiKey,
+  pexelsKey,
+  onChangePexelsKey,
   licenseKey,
   onChangeLicenseKey,
   licenseStatus,
@@ -18,6 +20,8 @@ export function SettingsPage({
 }: {
   geminiKey: string;
   onChangeGeminiKey: (v: string) => void;
+  pexelsKey: string;
+  onChangePexelsKey: (v: string) => void;
   licenseKey: string;
   onChangeLicenseKey: (v: string) => void;
   licenseStatus: "Activated" | "Trial" | "Locked";
@@ -52,9 +56,9 @@ export function SettingsPage({
       <Card className="p-6">
         <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
           <KeyRound className="h-4 w-4 text-zinc-300" />
-          API key
+          API keys
         </div>
-        <div className="mt-4 grid gap-3">
+        <div className="mt-4 grid gap-5">
           <label className="grid gap-2">
             <div className="text-xs font-semibold text-zinc-300">Gemini API key</div>
             <input
@@ -69,6 +73,23 @@ export function SettingsPage({
             />
             <div className="text-xs text-zinc-400">
               ClipNews AI never shows a built-in master key. Use your own key, or activate a license when available.
+            </div>
+          </label>
+
+          <label className="grid gap-2">
+            <div className="text-xs font-semibold text-zinc-300">Pexels API key (optional)</div>
+            <input
+              value={pexelsKey}
+              onChange={(e) => onChangePexelsKey(e.currentTarget.value)}
+              className="rounded-lg border border-white/10 bg-black/30 px-4 py-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-cyan-400/50"
+              placeholder="Paste your Pexels API key…"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              type="password"
+            />
+            <div className="text-xs text-zinc-400">
+              Add a Pexels API key if you want to pull stock footage instead of generating images.
             </div>
           </label>
         </div>

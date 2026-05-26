@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { AbsoluteFill, Audio, Img, Sequence, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Audio, Img, Sequence, Video, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { TechnicalGlitchBg } from "./TechnicalGlitchBg";
 
 // Montserrat (includes Vietnamese glyphs via latin-ext)
@@ -16,10 +16,12 @@ export type NewsScene = {
   duration_sec: number;
   caption_lines: string[];
   voiceover: string;
-  layout?: "screenshot" | "big_callout" | "split";
+  layout?: "screenshot" | "big_callout" | "split" | "broll";
   callouts?: string[];
   screenshot_path?: string;
   screenshot_src?: string;
+  broll_path?: string;
+  broll_src?: string;
 };
 
 export type NewsStoryV1Props = {
@@ -155,7 +157,43 @@ const CalloutChips: React.FC<{ items: string[]; frame: number; enabled: boolean 
   );
 };
 
-const VisualCard: React.FC<{ src?: string; frame: number; height: number }> = ({ src, frame, height }) => {
+const VisualCard: React.FC<{ src?: string; brollSrc?: string; layout?: string; frame: number; height: number }> = ({ src, brollSrc, layout, frame, height }) => {
+  if (layout === "broll" && brollSrc) {
+    return (
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 920,
+          height,
+          borderRadius: 22,
+          overflow: "hidden",
+          position: "relative",
+          border: "1px solid rgba(0,255,255,0.18)",
+          boxShadow:
+            "0 18px 55px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,255,255,0.06) inset, 0 0 34px rgba(0,255,255,0.12)",
+          background: "rgba(0,0,0,0.25)",
+        }}
+      >
+        <Video
+          src={brollSrc}
+          muted
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "linear-gradient(180deg, rgba(0,0,0,0.10) 0%, rgba(0,0,0,0.55) 100%)",
+          }}
+        />
+      </div>
+    );
+  }
+
   if (!src) return null;
   const t = interpolate(frame, [0, 20], [0, 1], {
     extrapolateLeft: "clamp",
@@ -319,7 +357,7 @@ const SceneView: React.FC<{
             </div>
           </div>
         ) : (
-          <VisualCard src={scene.screenshot_src} frame={frame} height={cardHeight} />
+          <VisualCard src={scene.screenshot_src} brollSrc={scene.broll_src} layout={layout} frame={frame} height={cardHeight} />
         )}
 
         <CalloutChips

@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { AbsoluteFill, Audio, Img, Sequence, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Audio, Img, Sequence, Video, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 
 // Montserrat (includes Vietnamese glyphs via latin-ext)
 import "@fontsource/montserrat/400.css";
@@ -154,7 +154,43 @@ const CalloutChips: React.FC<{ items: string[]; frame: number; enabled: boolean 
   );
 };
 
-const VisualCard: React.FC<{ src?: string; frame: number; height: number }> = ({ src, frame, height }) => {
+const VisualCard: React.FC<{ src?: string; brollSrc?: string; layout?: string; frame: number; height: number }> = ({ src, brollSrc, layout, frame, height }) => {
+  if (layout === "broll" && brollSrc) {
+    return (
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 920,
+          height,
+          borderRadius: 12,
+          overflow: "hidden",
+          position: "relative",
+          border: "1px solid rgba(148,163,184,0.18)",
+          boxShadow:
+            "0 18px 55px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,255,255,0.06) inset",
+          background: "rgba(15,23,42,0.4)",
+        }}
+      >
+        <Video
+          src={brollSrc}
+          muted
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "linear-gradient(180deg, rgba(0,0,0,0.10) 0%, rgba(0,0,0,0.55) 100%)",
+          }}
+        />
+      </div>
+    );
+  }
+
   if (!src) return null;
   const t = interpolate(frame, [0, 20], [0, 1], {
     extrapolateLeft: "clamp",
@@ -301,7 +337,7 @@ const SceneView: React.FC<{
             </div>
           </div>
         ) : (
-          <VisualCard src={scene.screenshot_src} frame={frame} height={cardHeight} />
+          <VisualCard src={scene.screenshot_src} brollSrc={scene.broll_src} layout={layout} frame={frame} height={cardHeight} />
         )}
 
         <CalloutChips

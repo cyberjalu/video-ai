@@ -1,6 +1,7 @@
 import { DEFAULT_OPTIONS, type LayoutMode, type RenderOptions, type RenderPreset } from "./types";
 
 const KEY_GEMINI = "GEMINI_API_KEY";
+const KEY_PEXELS = "PEXELS_API_KEY";
 const KEY_LICENSE = "CLIPNEWS_LICENSE_KEY";
 const KEY_PRESET = "RENDER_PRESET";
 const KEY_TEMPLATE = "RENDER_TEMPLATE";
@@ -14,6 +15,14 @@ export function loadGeminiKey() {
 
 export function saveGeminiKey(v: string) {
   localStorage.setItem(KEY_GEMINI, v.trim());
+}
+
+export function loadPexelsKey() {
+  return (localStorage.getItem(KEY_PEXELS) ?? "").trim();
+}
+
+export function savePexelsKey(v: string) {
+  localStorage.setItem(KEY_PEXELS, v.trim());
 }
 
 export function loadLicenseKey() {

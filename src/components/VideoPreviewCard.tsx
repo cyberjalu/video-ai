@@ -138,6 +138,7 @@ export function VideoPreviewCard({
                   onClick={togglePlay}
                 >
                   <video
+                    key={src}
                     ref={videoRef}
                     src={src}
                     autoPlay
