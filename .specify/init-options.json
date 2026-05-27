@@ -1,9 +1,10 @@
 {
-  "ai": "copilot",
+  "ai": "agy",
+  "ai_skills": true,
   "branch_numbering": "sequential",
-  "context_file": ".github/copilot-instructions.md",
+  "context_file": "AGENTS.md",
   "here": true,
-  "integration": "copilot",
+  "integration": "agy",
   "script": "sh",
-  "speckit_version": "0.8.10"
+  "speckit_version": "0.8.14"
 }

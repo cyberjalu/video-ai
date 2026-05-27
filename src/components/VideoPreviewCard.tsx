@@ -80,12 +80,13 @@ export function VideoPreviewCard({
 
   const togglePlay = () => {
     if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
+      if (videoRef.current.paused) {
+        videoRef.current.play()?.catch(() => {});
+        setIsPlaying(true);
       } else {
-        videoRef.current.play();
+        videoRef.current.pause();
+        setIsPlaying(false);
       }
-      setIsPlaying(!isPlaying);
     }
   };
 

@@ -141,8 +141,39 @@ export function SettingsPage({
             </SecondaryButton>
           </div>
         </Card>
+      </div>
 
+      <div className="grid gap-5 lg:grid-cols-2">
         <Card className="p-6">
+          <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
+            <Palette className="h-4 w-4 text-zinc-300" />
+            AI Models
+          </div>
+          <div className="mt-4 grid gap-4">
+            <label className="grid gap-2">
+              <div className="text-xs font-semibold text-zinc-300">Content Model</div>
+              <select
+                value={options.contentModel ?? "gemini-3.5-flash"}
+                onChange={(e) => onChangeOptions({ ...options, contentModel: e.currentTarget.value })}
+                className="rounded-lg border border-white/10 bg-black/30 px-4 py-3 text-sm text-zinc-200 focus:outline-none focus:border-cyan-400/50"
+              >
+                <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
+                <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite</option>
+              </select>
+            </label>
+            <label className="grid gap-2">
+              <div className="text-xs font-semibold text-zinc-300">Audio Model</div>
+              <select
+                value={options.audioModel ?? "gemini-3.1-flash-tts-preview"}
+                onChange={(e) => onChangeOptions({ ...options, audioModel: e.currentTarget.value })}
+                className="rounded-lg border border-white/10 bg-black/30 px-4 py-3 text-sm text-zinc-200 focus:outline-none focus:border-cyan-400/50"
+              >
+                <option value="gemini-3.1-flash-tts-preview">Gemini 3.1 Flash TTS Preview</option>
+                <option value="gemini-2.5-flash-preview-tts">Gemini 2.5 Flash TTS Preview</option>
+              </select>
+            </label>
+          </div>
+        </Card>        <Card className="p-6">
           <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
             <Speaker className="h-4 w-4 text-zinc-300" />
             Voice style

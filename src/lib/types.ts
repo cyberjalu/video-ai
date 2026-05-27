@@ -9,6 +9,8 @@ export type RenderOptions = {
   enable_progress: boolean;
   layout_mode: LayoutMode;
   voice?: string;
+  contentModel?: string;
+  audioModel?: string;
 };
 
 export const DEFAULT_OPTIONS: RenderOptions = {
@@ -18,6 +20,8 @@ export const DEFAULT_OPTIONS: RenderOptions = {
   enable_progress: true,
   layout_mode: "tri",
   voice: "Zephyr",
+  contentModel: "gemini-3.5-flash",
+  audioModel: "gemini-3.1-flash-tts-preview",
 };
 
 export type AppPage = "create" | "history" | "templates" | "settings";

@@ -15,6 +15,10 @@ struct RenderOptions {
     enable_progress: Option<bool>,
     layout_mode: Option<String>,
     voice: Option<String>,
+    #[serde(rename = "contentModel")]
+    content_model: Option<String>,
+    #[serde(rename = "audioModel")]
+    audio_model: Option<String>,
 }
 
 #[tauri::command]
@@ -69,6 +73,14 @@ fn start_render(
             .as_ref()
             .and_then(|o| o.voice.as_deref())
             .unwrap_or("Zephyr");
+        let content_model = options
+            .as_ref()
+            .and_then(|o| o.content_model.as_deref())
+            .unwrap_or("gemini-3.5-flash");
+        let audio_model = options
+            .as_ref()
+            .and_then(|o| o.audio_model.as_deref())
+            .unwrap_or("gemini-3.1-flash-tts-preview");
 
         let mut cmd = Command::new("node");
         cmd.current_dir(&workdir)
@@ -101,6 +113,10 @@ fn start_render(
             .arg(if enable_progress { "true" } else { "false" })
             .arg("--voice")
             .arg(voice)
+            .arg("--contentModel")
+            .arg(content_model)
+            .arg("--audioModel")
+            .arg(audio_model)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
 
@@ -188,7 +204,7 @@ fn list_output_dirs() -> Result<Vec<String>, String> {
     for entry in entries.flatten() {
         if let Ok(meta) = entry.metadata() {
             if meta.is_dir() {
-                if let Some(name) = entry.file_name().to_str() {
+                if let Some(_name) = entry.file_name().to_str() {
                     let path_str = entry.path().to_string_lossy().to_string();
                     dirs.push(path_str);
                 }

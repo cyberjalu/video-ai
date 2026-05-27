@@ -25,6 +25,8 @@ const ArgsSchema = z.object({
   enableCallouts: z.boolean().optional(),
   enableProgress: z.boolean().optional(),
   voice: z.string().optional(),
+  contentModel: z.string().optional(),
+  audioModel: z.string().optional(),
 });
 
 type SceneRole =
@@ -47,6 +49,8 @@ type RenderPrefs = {
   layoutMode: LayoutMode;
   enableCallouts: boolean;
   enableProgress: boolean;
+  contentModel?: string;
+  audioModel?: string;
 };
 
 const VideoPlanSchema = z.object({
@@ -113,6 +117,8 @@ function parseArgs(argv: string[]) {
     enableCallouts: parseBool(out.enableCallouts),
     enableProgress: parseBool(out.enableProgress),
     voice: out.voice,
+    contentModel: out.contentModel,
+    audioModel: out.audioModel,
   });
 }
 
@@ -531,7 +537,7 @@ async function planVideoWithGemini(articleText: string, title: string, geminiKey
   let lastError = "";
   for (let attempt = 1; attempt <= 2; attempt++) {
     const res = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: prefs.contentModel || "gemini-3.5-flash",
       contents: [{ parts: [{ text: prompt }] }],
     });
 
@@ -611,7 +617,7 @@ Ràng buộc chung:
 - caption_lines là tóm tắt trực tiếp của voiceover.
 - voiceover mở đầu bằng câu diễn giải lại caption_lines.
 ${calloutRule}
-- Layout MẶC ĐỊNH bắt buộc là "big_callout" hoặc "split" vì video này dạng Typography (không có ảnh). ĐỪNG trả về "screenshot".
+- Layout MẶC ĐỊNH bắt buộc là "big_callout", "split" hoặc "broll". ĐỪNG trả về "screenshot". Hãy dùng "broll" cho khoảng 50% số lượng cảnh (kèm pexels_query) để video thêm sinh động.
 - Giọng văn: Kể chuyện hấp dẫn, cuốn hút, dứt khoát.
 
 Yêu cầu/Ý tưởng của người dùng:
@@ -626,7 +632,7 @@ async function planVideoFromPromptWithGemini(userPrompt: string, geminiKey: stri
   let lastError = "";
   for (let attempt = 1; attempt <= 2; attempt++) {
     const res = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: prefs.contentModel || "gemini-3.5-flash",
       contents: [{ parts: [{ text: prompt }] }],
     });
 
@@ -691,7 +697,7 @@ async function planVideoWithOpenAI(
   return plan;
 }
 
-async function geminiTtsToWav(text: string, outFile: string, geminiKey: string, voiceName: string = "Zephyr") {
+async function geminiTtsToWav(text: string, outFile: string, geminiKey: string, voiceName: string = "Zephyr", audioModel: string = "gemini-3.1-flash-tts-preview") {
   emit({ type: "step_start", step: "tts" });
   const ai = new GoogleGenAI({ apiKey: geminiKey });
 
@@ -802,7 +808,7 @@ INPUT PLAN JSON:
 ${JSON.stringify(plan)}`;
 
   const res = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
+    model: prefs.contentModel || "gemini-3.5-flash",
     contents: [{ parts: [{ text: prompt }] }],
   });
   const parsed = parsePlanFromModelOutput(res.text ?? "");
