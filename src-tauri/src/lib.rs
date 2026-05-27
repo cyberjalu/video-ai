@@ -26,15 +26,20 @@ fn start_render(
     app: tauri::AppHandle,
     url: Option<String>,
     prompt: Option<String>,
+    audio_path: Option<String>,
+    script: Option<String>,
+    platform: Option<String>,
     gemini_api_key: String,
     pexels_api_key: Option<String>,
     options: Option<RenderOptions>,
 ) -> Result<(), String> {
     let url = url.unwrap_or_default();
     let prompt = prompt.unwrap_or_default();
+    let audio_path = audio_path.unwrap_or_default();
+    let script = script.unwrap_or_default();
 
-    if url.trim().is_empty() && prompt.trim().is_empty() {
-        return Err("Phải cung cấp URL hoặc Prompt".into());
+    if url.trim().is_empty() && prompt.trim().is_empty() && audio_path.trim().is_empty() {
+        return Err("Phải cung cấp URL, Prompt hoặc Audio Path".into());
     }
     if gemini_api_key.trim().is_empty() {
         return Err("Thiếu GEMINI_API_KEY".into());
@@ -99,6 +104,15 @@ fn start_render(
             cmd.arg("--url").arg(url);
         } else if !prompt.trim().is_empty() {
             cmd.arg("--prompt").arg(prompt);
+        } else if !audio_path.trim().is_empty() {
+            cmd.arg("--audioPath").arg(audio_path);
+            if !script.trim().is_empty() {
+                cmd.arg("--script").arg(script);
+            }
+        }
+
+        if let Some(plat) = platform {
+            cmd.arg("--platform").arg(plat);
         }
 
         cmd.arg("--preset")
@@ -221,6 +235,7 @@ fn list_output_dirs() -> Result<Vec<String>, String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![greet, start_render, read_text_file, list_output_dirs])
         .run(tauri::generate_context!())

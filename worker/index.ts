@@ -9,10 +9,107 @@ import { GoogleGenAI } from "@google/genai";
 import wav from "wav";
 import { bundle } from "@remotion/bundler";
 import { getCompositions, renderMedia } from "@remotion/renderer";
+import { execFile } from "node:child_process";
+
+const execFileP = (file: string, args: string[]) =>
+  new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+    execFile(file, args, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+      if (err) return reject(Object.assign(err, { stdout, stderr }));
+      resolve({ stdout, stderr });
+    });
+  });
+
+async function getAudioDurationSec(filePath: string): Promise<number> {
+  const probe = await execFileP("ffprobe", [
+    "-v",
+    "quiet",
+    "-print_format",
+    "json",
+    "-show_format",
+    "-show_streams",
+    filePath,
+  ]);
+  const json = JSON.parse(probe.stdout);
+  return parseFloat(json.format.duration);
+}
+
+async function planVideoFromScriptWithGemini(script: string, durationSec: number, geminiKey: string, prefs: any): Promise<VideoPlan> {
+  emit({ type: "step_start", step: "plan" });
+  const ai = new GoogleGenAI({ apiKey: geminiKey });
+  
+  const prompt = `Bạn là một đạo diễn video YouTube chuyên nghiệp.
+Nhiệm vụ của bạn là phân tích kịch bản (script) sau đây và chia nó thành các cảnh (scenes).
+Tổng thời lượng của video là đúng ${durationSec.toFixed(1)} giây. Bạn hãy tự phân bổ thời gian (duration_sec) cho từng cảnh sao cho tỷ lệ thuận với độ dài câu thoại, và TỔNG THỜI GIAN CÁC CẢNH PHẢI BẰNG ĐÚNG ${Math.round(durationSec)} giây.
+
+Kịch bản gốc (Script):
+"""
+${script}
+"""
+
+Yêu cầu output JSON (KHÔNG CÓ MARKDOWN):
+{
+  "title": "Tiêu đề ngắn",
+  "target_duration_sec": ${Math.round(durationSec)},
+  "scenes": [
+    {
+      "id": "s1",
+      "role": "hook",
+      "duration_sec": 5,
+      "caption_lines": ["Dòng 1", "Dòng 2"],
+      "voiceover": "Câu nói tương ứng trong kịch bản",
+      "layout": "broll",
+      "pexels_query": "hacker"
+    }
+  ]
+}
+
+Quy tắc:
+- Mọi cảnh PHẢI CÓ layout là "broll".
+- Mọi cảnh PHẢI CÓ pexels_query (1-3 từ khóa tiếng Anh ngắn gọn như "nature", "working", "happy person").
+- caption_lines: trích xuất vài từ khóa ngắn gọn làm phụ đề.
+- voiceover: Lấy CHÍNH XÁC lời thoại từ kịch bản để khớp. KHÔNG ĐƯỢC BỊA THÊM HOẶC SỬA ĐỔI LỜI THOẠI!`;
+
+  let lastError = "";
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const res = await ai.models.generateContent({
+      model: prefs.contentModel || "gemini-3.5-flash",
+      contents: [{ parts: [{ text: prompt }] }],
+    });
+
+    try {
+      const parsed = parsePlanFromModelOutput(res.text ?? "");
+      const plan = normalizePlan(parsed, prefs);
+      // Force match duration
+      const total = plan.scenes.reduce((sum, s) => sum + (s.duration_sec ?? 0), 0);
+      if (total > 0 && Math.abs(total - durationSec) > 2) {
+        const factor = durationSec / total;
+        plan.scenes.forEach(s => {
+          s.duration_sec = Math.round((s.duration_sec ?? 0) * factor);
+        });
+      }
+      
+      emit({
+        type: "step_done",
+        step: "plan",
+        scenes: plan.scenes.length,
+        target: plan.target_duration_sec,
+        attempt,
+      });
+      return plan;
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
+      emit({ type: "log", step: "plan", message: `Plan parse retry ${attempt}: ${lastError}` });
+    }
+  }
+  throw new Error("Không thể tạo plan sau 2 lần thử: " + lastError);
+}
 
 const ArgsSchema = z.object({
   url: z.string().url().optional(),
   prompt: z.string().optional(),
+  audioPath: z.string().optional(),
+  script: z.string().optional(),
+  platform: z.enum(["youtube", "tiktok"]).optional(),
   geminiKey: z.string().optional(),
   openaiKey: z.string().optional(),
   pexelsKey: z.string().optional(),
@@ -105,6 +202,9 @@ function parseArgs(argv: string[]) {
   return ArgsSchema.parse({
     url: out.url,
     prompt: out.prompt,
+    audioPath: out.audioPath,
+    script: out.script,
+    platform: out.platform as any,
     geminiKey: out.geminiKey ?? process.env.GEMINI_API_KEY,
     openaiKey: out.openaiKey ?? process.env.OPENAI_API_KEY,
     pexelsKey: out.pexelsKey ?? process.env.PEXELS_API_KEY,
@@ -153,8 +253,8 @@ async function writeJson(p: string, v: unknown) {
   await fs.writeFile(p, JSON.stringify(v, null, 2), "utf-8");
 }
 
-async function fetchPexelsVideo(query: string, pexelsKey: string, outPath: string): Promise<string> {
-  const url = `https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&per_page=1&orientation=portrait`;
+async function fetchPexelsVideo(query: string, pexelsKey: string, outPath: string, orientation: "portrait" | "landscape" = "portrait"): Promise<string> {
+  const url = `https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&per_page=1&orientation=${orientation}`;
   const response = await fetch(url, {
     headers: {
       Authorization: pexelsKey,
@@ -1044,15 +1144,6 @@ async function qc(projectDir: string, mp4Path: string) {
   const qcDir = path.join(projectDir, "qc");
   await ensureDir(qcDir);
 
-  const { execFile } = await import("node:child_process");
-  const execFileP = (file: string, args: string[]) =>
-    new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
-      execFile(file, args, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
-        if (err) return reject(Object.assign(err, { stdout, stderr }));
-        resolve({ stdout, stderr });
-      });
-    });
-
   const probe = await execFileP("ffprobe", [
     "-v",
     "quiet",
@@ -1098,7 +1189,11 @@ async function main() {
     let browser, page, articleJson, screenshotsMeta: Record<string, { path: string }> = {};
     let plan: VideoPlan;
 
-    if (args.prompt) {
+    if (args.platform === "youtube" && args.audioPath && args.script) {
+      emit({ type: "log", step: "config", message: "Chế độ YouTube: Bỏ qua extract/screenshot." });
+      const duration = await getAudioDurationSec(args.audioPath);
+      plan = await planVideoFromScriptWithGemini(args.script, duration, args.geminiKey!, prefs);
+    } else if (args.prompt) {
       emit({ type: "log", step: "config", message: "Chế độ Prompt: Bỏ qua extract/screenshot." });
       if (args.planFile) {
         plan = normalizePlan(VideoPlanSchema.parse(JSON.parse(await fs.readFile(args.planFile, "utf-8"))) as VideoPlan, prefs);
@@ -1140,7 +1235,8 @@ async function main() {
           const outPath = path.join(brollsDir, `scene_${scene.id}.mp4`);
           emit({ type: "log", step: "fetch_broll", message: `Fetching Pexels B-roll for scene ${scene.id} with query: "${query}"` });
           try {
-            await fetchPexelsVideo(query, args.pexelsKey, outPath);
+            const orientation = args.platform === "youtube" ? "landscape" : "portrait";
+            await fetchPexelsVideo(query, args.pexelsKey, outPath, orientation);
             scene.broll_path = outPath;
             emit({ type: "log", step: "fetch_broll", message: `Successfully downloaded B-roll for scene ${scene.id}: ${outPath}` });
           } catch (e) {
@@ -1167,51 +1263,59 @@ async function main() {
 
     const audioPathRaw = path.join(baseOut, "tts", "voiceover.raw.wav");
     const audioPath = path.join(baseOut, "tts", "voiceover.wav");
-    const ttsProvider =
-      args.tts ??
-      (args.geminiKey ? "gemini" : args.openaiKey ? "openai" : "macos");
-
     let fittedAudioPath = audioPathRaw;
-    for (let retry = 0; retry < 3; retry++) {
-      const voiceover = plan.scenes.map((s) => s.voiceover.trim()).join("\n");
-      const ttsInput = plan.audio_prompt ? plan.audio_prompt : voiceover;
 
-      if (ttsProvider === "gemini") {
-        if (!args.geminiKey) throw new Error("tts=gemini nhưng thiếu GEMINI_API_KEY.");
-        await geminiTtsToWav(ttsInput, audioPathRaw, args.geminiKey, args.voice);
-      } else if (ttsProvider === "openai") {
-        if (!args.openaiKey) throw new Error("tts=openai nhưng thiếu OPENAI_API_KEY.");
-        await openaiTtsToWav(voiceover, audioPathRaw, args.openaiKey);
-      } else {
-        await macosSayTtsToWav(voiceover, audioPathRaw);
-      }
+    if (args.audioPath) {
+      emit({ type: "log", step: "tts", message: "Chế độ Audio: Bỏ qua TTS, dùng file upload." });
+      await ensureDir(path.join(baseOut, "tts"));
+      await execFileP("ffmpeg", ["-y", "-i", args.audioPath, audioPathRaw]);
+      fittedAudioPath = audioPathRaw;
+    } else {
+      const ttsProvider =
+        args.tts ??
+        (args.geminiKey ? "gemini" : args.openaiKey ? "openai" : "macos");
 
-      const planTotalSec = plan.scenes.reduce((s, sc) => s + (sc.duration_sec ?? 0), 0);
-      const fit = await fitAudioToTargetDuration(audioPathRaw, audioPath, planTotalSec, 1.5);
-      fittedAudioPath = fit.path;
+      for (let retry = 0; retry < 3; retry++) {
+        const voiceover = plan.scenes.map((s) => s.voiceover.trim()).join("\n");
+        const ttsInput = plan.audio_prompt ? plan.audio_prompt : voiceover;
 
-      if (!fit.requiresRewrite) break;
-      if (!args.geminiKey) {
+        if (ttsProvider === "gemini") {
+          if (!args.geminiKey) throw new Error("tts=gemini nhưng thiếu GEMINI_API_KEY.");
+          await geminiTtsToWav(ttsInput, audioPathRaw, args.geminiKey, args.voice);
+        } else if (ttsProvider === "openai") {
+          if (!args.openaiKey) throw new Error("tts=openai nhưng thiếu OPENAI_API_KEY.");
+          await openaiTtsToWav(voiceover, audioPathRaw, args.openaiKey);
+        } else {
+          await macosSayTtsToWav(voiceover, audioPathRaw);
+        }
+
+        const planTotalSec = plan.scenes.reduce((s, sc) => s + (sc.duration_sec ?? 0), 0);
+        const fit = await fitAudioToTargetDuration(audioPathRaw, audioPath, planTotalSec, 1.5);
+        fittedAudioPath = fit.path;
+
+        if (!fit.requiresRewrite) break;
+        if (!args.geminiKey) {
+          emit({
+            type: "log",
+            step: "audio_fit",
+            message: `Không có GEMINI_API_KEY để rewrite script, buộc speed-up cao (x${fit.factor.toFixed(2)}).`,
+          });
+          const forcedFit = await fitAudioToTargetDuration(audioPathRaw, audioPath, planTotalSec, 3);
+          fittedAudioPath = forcedFit.path;
+          break;
+        }
+        if (retry >= 2) {
+          throw new Error(
+            `Đã thử rút gọn voiceover nhiều lần nhưng vẫn quá dài (x${fit.factor.toFixed(2)}).`,
+          );
+        }
+        plan = await rewritePlanVoiceoverWithGemini(plan, planTotalSec, args.geminiKey, prefs);
         emit({
           type: "log",
-          step: "audio_fit",
-          message: `Không có GEMINI_API_KEY để rewrite script, buộc speed-up cao (x${fit.factor.toFixed(2)}).`,
+          step: "plan_rewrite",
+          message: `Đã rút gọn voiceover lần ${retry + 1} để giữ tốc đọc <= 1.5x`,
         });
-        const forcedFit = await fitAudioToTargetDuration(audioPathRaw, audioPath, planTotalSec, 3);
-        fittedAudioPath = forcedFit.path;
-        break;
       }
-      if (retry >= 2) {
-        throw new Error(
-          `Đã thử rút gọn voiceover nhiều lần nhưng vẫn quá dài (x${fit.factor.toFixed(2)}).`,
-        );
-      }
-      plan = await rewritePlanVoiceoverWithGemini(plan, planTotalSec, args.geminiKey, prefs);
-      emit({
-        type: "log",
-        step: "plan_rewrite",
-        message: `Đã rút gọn voiceover lần ${retry + 1} để giữ tốc đọc <= 1.5x`,
-      });
     }
 
     await ensureDir(path.join(baseOut, "plan"));

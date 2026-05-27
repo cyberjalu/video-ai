@@ -1,10 +1,13 @@
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import type { RenderOptions } from "./types";
 
-export async function startRender(params: { url?: string; prompt?: string; geminiApiKey: string; pexelsApiKey?: string; options: RenderOptions }) {
+export async function startRender(params: { url?: string; prompt?: string; audioPath?: string; script?: string; platform?: string; geminiApiKey: string; pexelsApiKey?: string; options: RenderOptions }) {
   await invoke("start_render", {
     url: params.url,
     prompt: params.prompt,
+    audioPath: params.audioPath,
+    script: params.script,
+    platform: params.platform,
     geminiApiKey: params.geminiApiKey,
     pexelsApiKey: params.pexelsApiKey,
     options: params.options,

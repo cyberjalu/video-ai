@@ -8,6 +8,7 @@ import { Sidebar } from "./components/Sidebar";
 import { TopBar } from "./components/TopBar";
 import { ToastProvider, useToast } from "./components/Toast";
 import { CreateVideoPage } from "./pages/CreateVideoPage";
+import { YouTubeVideoPage } from "./pages/YouTubeVideoPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { HistoryPage } from "./pages/HistoryPage";
 import { TemplatesPage } from "./pages/TemplatesPage";
@@ -35,6 +36,7 @@ import type { UiStep } from "./lib/generation";
 
 const PAGE_TITLES: Record<AppPage, string> = {
   create: "Create Video",
+  youtube: "YouTube Video",
   history: "History",
   templates: "Templates",
   settings: "Settings",
@@ -72,6 +74,8 @@ function AppInner() {
   const [inputMode, setInputMode] = useState<"url" | "prompt">("url");
   const [promptText, setPromptText] = useState("");
   const [url, setUrl] = useState("https://openai.com/index/gpt-5-5-with-trusted-access-for-cyber/");
+  const [audioPath, setAudioPath] = useState("");
+  const [scriptText, setScriptText] = useState("");
   const [urlError, setUrlError] = useState<string | null>(null);
   const [status, setStatus] = useState<GenerationStatus>("idle");
   const [steps, setSteps] = useState<UiStep[]>(initialSteps());
@@ -247,6 +251,11 @@ function AppInner() {
 
   // ─── Input Validation ────────────────────────────────────────────────────────
   function validateInput(): string | null {
+    if (page === "youtube") {
+      if (!audioPath) return "Please select an audio file.";
+      if (!scriptText.trim()) return "Please enter the script text.";
+      return null;
+    }
     if (inputMode === "url") {
       if (!url.trim()) return "Please enter an article URL.";
       try {
@@ -327,7 +336,9 @@ function AppInner() {
 
     // Extract domain for display
     try {
-      if (inputMode === "url") {
+      if (page === "youtube") {
+        setSourceDomain("YouTube Script");
+      } else if (inputMode === "url") {
         setSourceDomain(new URL(url).hostname.replace("www.", ""));
       } else {
         setSourceDomain("AI Prompt");
@@ -341,8 +352,11 @@ function AppInner() {
 
     try {
       await startRender({
-        url: inputMode === "url" ? url : undefined,
-        prompt: inputMode === "prompt" ? promptText : undefined,
+        url: page === "create" && inputMode === "url" ? url : undefined,
+        prompt: page === "create" && inputMode === "prompt" ? promptText : undefined,
+        audioPath: page === "youtube" ? audioPath : undefined,
+        script: page === "youtube" ? scriptText : undefined,
+        platform: page === "youtube" ? "youtube" : undefined,
         geminiApiKey: key,
         pexelsApiKey: pexelsKey,
         options,
@@ -354,7 +368,7 @@ function AppInner() {
       setSteps((prev) => prev.map((s) => (s.state === "running" ? { ...s, state: "failed" } : s)));
       toast({ title: "Failed to start", description: String(e), variant: "error" });
     }
-  }, [url, promptText, inputMode, options, toast]);
+  }, [url, promptText, inputMode, audioPath, scriptText, page, options, toast]);
 
   function handleCreateAnother() {
     setStatus("idle");
@@ -372,6 +386,8 @@ function AppInner() {
     setSuggestedDurationSec(null);
     setProgressDescription(undefined);
     setUrl("");
+    setAudioPath("");
+    setScriptText("");
     stopTimer();
   }
 
@@ -413,6 +429,33 @@ function AppInner() {
     >
       <AnimatePresence mode="wait">
         <div key={page} className="w-full h-full">
+          {page === "youtube" && (
+            <YouTubeVideoPage
+              audioPath={audioPath}
+              onChangeAudioPath={setAudioPath}
+              scriptText={scriptText}
+              onChangeScript={setScriptText}
+              error={urlError ?? null}
+              onCreate={handleCreate}
+              isBusy={isBusy}
+              status={status}
+              steps={steps}
+              progressPercent={progressPercent}
+              elapsedMs={elapsedMs}
+              progressDescription={progressDescription}
+              articleTitle={articleTitle}
+              suggestedScenes={suggestedScenes}
+              suggestedDurationSec={suggestedDurationSec}
+              mp4Path={mp4Path}
+              outputDir={outputDir}
+              plan={plan}
+              captionText={captionText}
+              errorMessage={errorMessage}
+              onCreateAnother={handleCreateAnother}
+              onCopyCaption={handleCopyCaption}
+            />
+          )}
+
           {page === "create" && (
             <CreateVideoPage
               inputMode={inputMode}

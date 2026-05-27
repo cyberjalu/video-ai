@@ -1,6 +1,6 @@
 export type RenderPreset = "deep_explainer" | "news_60_80" | "ultra_25_35";
 export type LayoutMode = "tri" | "mono" | "dual";
-export type TemplateId = "NewsStoryV1" | "CorporateNewsV1";
+export type TemplateId = "NewsStoryV1" | "CorporateNewsV1" | "YouTubeStoryV1";
 
 export type RenderOptions = {
   preset: RenderPreset;
@@ -24,7 +24,7 @@ export const DEFAULT_OPTIONS: RenderOptions = {
   audioModel: "gemini-3.1-flash-tts-preview",
 };
 
-export type AppPage = "create" | "history" | "templates" | "settings";
+export type AppPage = "create" | "youtube" | "history" | "templates" | "settings";
 
 export type GenerationStatus =
   | "idle"
