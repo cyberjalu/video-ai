@@ -9,6 +9,10 @@ const LABELS: Record<GenerationStatus, string> = {
   generating_voiceover: "Voiceover",
   rendering_video: "Rendering",
   finalizing_export: "Finalizing",
+  extracting_audio: "Extracting Audio",
+  transcribing: "Transcribing",
+  transcript_ready: "Transcript Ready",
+  merging_audio: "Merging Video",
   completed: "Completed",
   failed: "Failed",
 };

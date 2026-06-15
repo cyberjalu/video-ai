@@ -1,5 +1,5 @@
 import type React from "react";
-import { History, LayoutTemplate, Settings2, Sparkles, Zap, MonitorPlay } from "lucide-react";
+import { History, LayoutTemplate, Settings2, Sparkles, Zap, MonitorPlay, AudioLines } from "lucide-react";
 import pkg from "../../package.json";
 import { cn } from "../lib/cn";
 import type { AppPage } from "../lib/types";
@@ -15,6 +15,7 @@ type NavItem = {
 const NAV: NavItem[] = [
   { id: "create", label: "Create TikTok", icon: <Sparkles className="h-4 w-4" />, enabled: true },
   { id: "youtube", label: "YouTube Video", icon: <MonitorPlay className="h-4 w-4" />, enabled: true },
+  { id: "video_dub", label: "Video Dub", icon: <AudioLines className="h-4 w-4" />, enabled: true },
   { id: "history", label: "History", icon: <History className="h-4 w-4" />, enabled: true },
   { id: "templates", label: "Templates", icon: <LayoutTemplate className="h-4 w-4" />, enabled: true },
   { id: "settings", label: "Settings", icon: <Settings2 className="h-4 w-4" />, enabled: true },

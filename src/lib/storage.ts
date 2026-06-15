@@ -8,6 +8,10 @@ const KEY_TEMPLATE = "RENDER_TEMPLATE";
 const KEY_LAYOUT = "RENDER_LAYOUT_MODE";
 const KEY_CALLOUTS = "RENDER_ENABLE_CALLOUTS";
 const KEY_PROGRESS = "RENDER_ENABLE_PROGRESS";
+const KEY_DUB_VOICE = "VIDEO_DUB_DEFAULT_VOICE";
+const KEY_DUB_LANG = "VIDEO_DUB_DEFAULT_LANGUAGE";
+const KEY_DUB_MODE = "VIDEO_DUB_ORIGINAL_AUDIO_MODE";
+const KEY_DUB_DUCK = "VIDEO_DUB_DUCK_LEVEL";
 
 export function loadGeminiKey() {
   return (localStorage.getItem(KEY_GEMINI) ?? "").trim();
@@ -51,6 +55,10 @@ export function loadRenderOptions(): RenderOptions {
   const layoutRaw = localStorage.getItem(KEY_LAYOUT) ?? "";
   const enableCalloutsRaw = localStorage.getItem(KEY_CALLOUTS);
   const enableProgressRaw = localStorage.getItem(KEY_PROGRESS);
+  const dubVoice = localStorage.getItem(KEY_DUB_VOICE);
+  const dubLang = localStorage.getItem(KEY_DUB_LANG);
+  const dubMode = localStorage.getItem(KEY_DUB_MODE);
+  const dubDuck = localStorage.getItem(KEY_DUB_DUCK);
 
   return {
     preset: isPreset(presetRaw) ? presetRaw : DEFAULT_OPTIONS.preset,
@@ -60,6 +68,10 @@ export function loadRenderOptions(): RenderOptions {
       enableCalloutsRaw == null ? DEFAULT_OPTIONS.enable_callouts : enableCalloutsRaw === "true",
     enable_progress:
       enableProgressRaw == null ? DEFAULT_OPTIONS.enable_progress : enableProgressRaw === "true",
+    videoDubVoice: dubVoice || DEFAULT_OPTIONS.videoDubVoice,
+    videoDubLanguage: dubLang || DEFAULT_OPTIONS.videoDubLanguage,
+    videoDubMode: (dubMode === "replace" || dubMode === "duck") ? dubMode : DEFAULT_OPTIONS.videoDubMode,
+    videoDubDuckLevel: dubDuck ? parseFloat(dubDuck) : DEFAULT_OPTIONS.videoDubDuckLevel,
   };
 }
 
@@ -69,5 +81,9 @@ export function saveRenderOptions(o: RenderOptions) {
   localStorage.setItem(KEY_LAYOUT, o.layout_mode);
   localStorage.setItem(KEY_CALLOUTS, String(o.enable_callouts));
   localStorage.setItem(KEY_PROGRESS, String(o.enable_progress));
+  if (o.videoDubVoice) localStorage.setItem(KEY_DUB_VOICE, o.videoDubVoice);
+  if (o.videoDubLanguage) localStorage.setItem(KEY_DUB_LANG, o.videoDubLanguage);
+  if (o.videoDubMode) localStorage.setItem(KEY_DUB_MODE, o.videoDubMode);
+  if (o.videoDubDuckLevel !== undefined) localStorage.setItem(KEY_DUB_DUCK, String(o.videoDubDuckLevel));
 }
 

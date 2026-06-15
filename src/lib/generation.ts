@@ -6,7 +6,11 @@ export type UiStepId =
   | "writing_script"
   | "generating_voiceover"
   | "rendering_video"
-  | "finalizing_export";
+  | "finalizing_export"
+  | "extracting_audio"
+  | "transcribing"
+  | "transcript_ready"
+  | "merging_audio";
 
 export type UiStepState = "pending" | "running" | "completed" | "failed";
 

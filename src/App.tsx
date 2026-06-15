@@ -9,6 +9,7 @@ import { TopBar } from "./components/TopBar";
 import { ToastProvider, useToast } from "./components/Toast";
 import { CreateVideoPage } from "./pages/CreateVideoPage";
 import { YouTubeVideoPage } from "./pages/YouTubeVideoPage";
+import { VideoDubPage } from "./pages/VideoDubPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { HistoryPage } from "./pages/HistoryPage";
 import { TemplatesPage } from "./pages/TemplatesPage";
@@ -37,6 +38,7 @@ import type { UiStep } from "./lib/generation";
 const PAGE_TITLES: Record<AppPage, string> = {
   create: "Create Video",
   youtube: "YouTube Video",
+  video_dub: "Video Dub",
   history: "History",
   templates: "Templates",
   settings: "Settings",
@@ -485,6 +487,16 @@ function AppInner() {
               errorMessage={errorMessage}
               onCreateAnother={handleCreateAnother}
               onCopyCaption={handleCopyCaption}
+            />
+          )}
+
+          {page === "video_dub" && (
+            <VideoDubPage
+              options={options}
+              onChangeOptions={(o) => {
+                setOptions(o);
+                saveRenderOptions(o);
+              }}
             />
           )}
 

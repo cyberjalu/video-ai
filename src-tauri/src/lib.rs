@@ -232,12 +232,95 @@ fn list_output_dirs() -> Result<Vec<String>, String> {
     Ok(dirs)
 }
 
+#[tauri::command]
+fn run_dub_worker(
+    app: tauri::AppHandle,
+    action: String,
+    video_path: Option<String>,
+    audio_path: Option<String>,
+    text: Option<String>,
+    gemini_key: Option<String>,
+    out_dir: Option<String>,
+    voice: Option<String>,
+    mode: Option<String>,
+    duck_level: Option<f64>,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn(async move {
+        use std::io::{BufRead, BufReader};
+        use std::process::{Command, Stdio};
+
+        let workdir = std::env::current_dir()
+            .ok()
+            .and_then(|d| d.parent().map(|p| p.to_path_buf()))
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+
+        let mut cmd = Command::new("node");
+        cmd.current_dir(&workdir)
+            .arg("./node_modules/.bin/tsx")
+            .arg("./worker/dub.ts")
+            .arg("--action")
+            .arg(&action);
+
+        if let Some(v) = video_path { cmd.arg("--video").arg(v); }
+        if let Some(a) = audio_path { cmd.arg("--audio").arg(a); }
+        if let Some(t) = text { cmd.arg("--text").arg(t); }
+        if let Some(o) = out_dir { cmd.arg("--outDir").arg(o); }
+        if let Some(v) = voice { cmd.arg("--voice").arg(v); }
+        if let Some(m) = mode { cmd.arg("--mode").arg(m); }
+        if let Some(d) = duck_level { cmd.arg("--duckLevel").arg(d.to_string()); }
+
+        if let Some(k) = gemini_key {
+            cmd.env("GEMINI_API_KEY", k);
+        }
+
+        cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+
+        let mut child = match cmd.spawn() {
+            Ok(c) => c,
+            Err(e) => {
+                let _ = app.emit("dub_error", format!("Không chạy được dub worker: {}", e));
+                return;
+            }
+        };
+
+        if let Some(stdout) = child.stdout.take() {
+            let reader = BufReader::new(stdout);
+            for line in reader.lines().flatten() {
+                let _ = app.emit("dub_log", line);
+            }
+        }
+
+        if let Some(stderr) = child.stderr.take() {
+            let reader = BufReader::new(stderr);
+            for line in reader.lines().flatten() {
+                let _ = app.emit("dub_log", line);
+            }
+        }
+
+        match child.wait() {
+            Ok(status) => {
+                if status.success() {
+                    let _ = app.emit("dub_done", status.code().unwrap_or(0));
+                } else {
+                    let code = status.code().unwrap_or(-1);
+                    let _ = app.emit("dub_error", format!("Worker dub thoat voi ma loi {}", code));
+                }
+            }
+            Err(e) => {
+                let _ = app.emit("dub_error", format!("Worker dub lỗi: {}", e));
+            }
+        }
+    });
+
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet, start_render, read_text_file, list_output_dirs])
+        .invoke_handler(tauri::generate_handler![greet, start_render, read_text_file, list_output_dirs, run_dub_worker])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

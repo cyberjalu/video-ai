@@ -11,6 +11,10 @@ export type RenderOptions = {
   voice?: string;
   contentModel?: string;
   audioModel?: string;
+  videoDubVoice?: string;
+  videoDubLanguage?: string;
+  videoDubMode?: "replace" | "duck";
+  videoDubDuckLevel?: number;
 };
 
 export const DEFAULT_OPTIONS: RenderOptions = {
@@ -22,9 +26,13 @@ export const DEFAULT_OPTIONS: RenderOptions = {
   voice: "Zephyr",
   contentModel: "gemini-3.5-flash",
   audioModel: "gemini-3.1-flash-tts-preview",
+  videoDubVoice: "Achird",
+  videoDubLanguage: "vi-VN",
+  videoDubMode: "duck",
+  videoDubDuckLevel: 0.2,
 };
 
-export type AppPage = "create" | "youtube" | "history" | "templates" | "settings";
+export type AppPage = "create" | "youtube" | "video_dub" | "history" | "templates" | "settings";
 
 export type GenerationStatus =
   | "idle"
@@ -34,6 +42,10 @@ export type GenerationStatus =
   | "generating_voiceover"
   | "rendering_video"
   | "finalizing_export"
+  | "extracting_audio"
+  | "transcribing"
+  | "transcript_ready"
+  | "merging_audio"
   | "completed"
   | "failed";
 
@@ -47,7 +59,11 @@ export type WorkerStep =
   | "audio_fit"
   | "plan_rewrite"
   | "render"
-  | "qc";
+  | "qc"
+  | "extract_original_audio"
+  | "transcribe_original"
+  | "generate_dub_tts"
+  | "merge_dub_video";
 
 export type WorkerEvent =
   | { type: "step_start"; step: WorkerStep; [k: string]: unknown }
