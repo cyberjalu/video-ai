@@ -1165,6 +1165,24 @@ async function qc(projectDir: string, mp4Path: string) {
   return qcDir;
 }
 
+function assignScreenshotsToScenes(
+  plan: VideoPlan,
+  screenshots: Record<string, { path: string }>,
+): VideoPlan {
+  const screenshotSlots = ["lead", "fact", "context", "impact", "close"] as const;
+  let screenshotIndex = 0;
+
+  const scenes = plan.scenes.map((scene) => {
+    if (scene.layout !== "screenshot") return scene;
+    const slot = screenshotSlots[screenshotIndex % screenshotSlots.length];
+    screenshotIndex++;
+    const slotPath = screenshots[slot]?.path;
+    return slotPath ? { ...scene, screenshot_path: slotPath } : scene;
+  });
+
+  return { ...plan, scenes };
+}
+
 async function main() {
   const args = parseArgs(process.argv);
   const prefs = toRenderPrefs(args);
@@ -1218,6 +1236,11 @@ async function main() {
       } else {
         plan = await planVideoWithOpenAI(sourceText, articleJson.title, args.openaiKey!, prefs);
       }
+
+      // Assign screenshot paths to scenes with layout="screenshot"
+      plan = assignScreenshotsToScenes(plan, screenshotsMeta);
+      const assignedCount = plan.scenes.filter((s) => s.layout === "screenshot" && s.screenshot_path).length;
+      emit({ type: "step_done", step: "assign_screenshots", assigned: assignedCount });
     } else {
       throw new Error("Phải cung cấp --url hoặc --prompt.");
     }
