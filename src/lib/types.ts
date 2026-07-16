@@ -39,6 +39,7 @@ export type GenerationStatus =
   | "reading_article"
   | "capturing_screenshots"
   | "writing_script"
+  | "awaiting_assets"
   | "generating_voiceover"
   | "rendering_video"
   | "finalizing_export"
@@ -68,8 +69,9 @@ export type WorkerStep =
 export type WorkerEvent =
   | { type: "step_start"; step: WorkerStep; [k: string]: unknown }
   | { type: "step_done"; step: WorkerStep; [k: string]: unknown }
+  | { type: "plan_ready"; projectDir: string; plan: VideoPlan; [k: string]: unknown }
   | { type: "log"; step?: WorkerStep; message: string; [k: string]: unknown }
-  | { type: "done"; projectDir: string; mp4: string; [k: string]: unknown }
+  | { type: "done"; projectDir: string; mp4?: string; planReady?: boolean; [k: string]: unknown }
   | { type: "error"; message: string; [k: string]: unknown };
 
 export type VideoPlan = {
@@ -81,11 +83,17 @@ export type VideoPlan = {
     duration_sec: number;
     caption_lines: string[];
     voiceover: string;
-    layout?: "screenshot" | "big_callout" | "split" | "broll";
+    layout?: "screenshot" | "big_callout" | "split" | "broll" | "stat" | "bar_chart";
     callouts?: string[];
     screenshot_path?: string;
+    screenshot_file?: string;
+    image_fit?: "cover" | "contain";
     pexels_query?: string;
+    pexels_credit?: string;
+    pexels_url?: string;
     broll_path?: string;
+    stat?: { value: string; label: string; delta?: string };
+    chart?: { title?: string; bars: Array<{ label: string; value: number }> };
   }>;
 };
 

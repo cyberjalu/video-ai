@@ -13,8 +13,9 @@ import { cn } from "../lib/cn";
 import { loadGeminiKey } from "../lib/storage";
 import { runDubWorker, TranscriptSegment } from "../lib/dubbing";
 import type { GenerationStatus, RenderOptions } from "../lib/types";
-import { deriveProgressPercent, friendlyErrorMessage } from "../lib/generation";
+import { DUB_WORKER_TO_UI, deriveProgressPercent, friendlyErrorMessage } from "../lib/generation";
 import type { UiStep } from "../lib/generation";
+import { cancelDub } from "../lib/tauri";
 
 import { TranscriptSegmentEditor } from "../components/dub/TranscriptSegmentEditor";
 import { VoiceSettingsPanel } from "../components/dub/VoiceSettingsPanel";
@@ -78,19 +79,19 @@ export function VideoDubPage({
         try {
           const event = JSON.parse(e.payload);
           if (event.type === "step_start") {
-            updateStepState(event.step, "running");
+            const uiId = DUB_WORKER_TO_UI[event.step];
+            if (uiId) updateStepState(uiId, "running");
             if (event.step === "extract_original_audio") setStatus("extracting_audio");
             if (event.step === "transcribe_original") setStatus("transcribing");
             if (event.step === "generate_dub_tts") setStatus("generating_voiceover");
             if (event.step === "merge_dub_video") setStatus("merging_audio");
           }
           if (event.type === "step_done") {
-            updateStepState(event.step, "completed");
-            if (event.step === "extract_original_audio") {
-              // audio path extracted but unused
-            }
+            const uiId = DUB_WORKER_TO_UI[event.step];
+            if (uiId) updateStepState(uiId, "completed");
             if (event.step === "transcribe_original") {
               setSegments(event.segments);
+              updateStepState("transcript_ready", "completed");
               setStatus("transcript_ready");
               stopTimer();
             }
@@ -283,7 +284,26 @@ export function VideoDubPage({
         <div className="space-y-6 lg:col-span-7">
           {status !== "idle" && status !== "failed" && (
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-              <GenerationStepper steps={steps} progressPercent={progressPercent} elapsedMs={elapsedMs} />
+              <GenerationStepper
+                steps={steps}
+                progressPercent={progressPercent}
+                elapsedMs={elapsedMs}
+                onCancel={
+                  isBusy
+                    ? async () => {
+                        try {
+                          await cancelDub();
+                          stopTimer();
+                          setStatus("failed");
+                          setErrorMessage("Cancelled by user");
+                          toast({ title: "Cancelled", variant: "error" });
+                        } catch (e) {
+                          toast({ title: "Cancel failed", description: String(e), variant: "error" });
+                        }
+                      }
+                    : undefined
+                }
+              />
             </motion.div>
           )}
 

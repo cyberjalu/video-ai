@@ -10,20 +10,31 @@ const TEMPLATES: Array<{
   description: string;
   tags: string[];
   colors: string[];
+  aspect: "vertical" | "landscape";
 }> = [
   {
     id: "NewsStoryV1",
-    name: "Cyberpunk Glitch",
-    description: "Nền tối với glitch effect, text neon sáng (cyan, magenta), thích hợp cho content tech, crypto, trending.",
-    tags: ["Tech", "Trendy", "Neon"],
+    name: "Neon Glitch",
+    description: "Dark vertical template with neon accents — works for any news or explainer topic.",
+    tags: ["Vertical", "Trendy", "General news"],
     colors: ["bg-cyan-400", "bg-violet-500", "bg-black"],
+    aspect: "vertical",
   },
   {
     id: "CorporateNewsV1",
     name: "Corporate Slate",
-    description: "Sạch sẽ, chuyên nghiệp lấy cảm hứng từ các bản tin tài chính. Border vuông vức, ít animation rườm rà.",
-    tags: ["Finance", "Clean", "Professional"],
+    description: "Clean vertical news look inspired by finance briefings. Minimal motion, clear captions.",
+    tags: ["Vertical", "Clean", "Professional"],
     colors: ["bg-slate-800", "bg-blue-600", "bg-[#070d1a]"],
+    aspect: "vertical",
+  },
+  {
+    id: "YouTubeStoryV1",
+    name: "YouTube Landscape",
+    description: "1920×1080 landscape template used automatically for the YouTube Video flow.",
+    tags: ["Landscape", "YouTube", "16:9"],
+    colors: ["bg-cyan-400", "bg-violet-500", "bg-slate-950"],
+    aspect: "landscape",
   },
 ];
 
@@ -70,15 +81,14 @@ export function TemplatesPage({
                 </div>
               )}
 
-              {/* Preview abstraction */}
               <div className="mb-6 flex h-40 w-full items-center justify-center rounded-xl bg-black/40 shadow-inner">
-                <div className="relative h-[80%] w-[45%] overflow-hidden rounded-[8px] sm:w-[35%]">
-                  <div
-                    className={cn(
-                      "absolute inset-0 opacity-80",
-                      tpl.colors[2]
-                    )}
-                  />
+                <div
+                  className={cn(
+                    "relative overflow-hidden rounded-[8px]",
+                    tpl.aspect === "landscape" ? "h-[55%] w-[85%]" : "h-[80%] w-[45%] sm:w-[35%]",
+                  )}
+                >
+                  <div className={cn("absolute inset-0 opacity-80", tpl.colors[2])} />
                   <div className="absolute inset-x-2 bottom-3 flex flex-col gap-1.5">
                     <div className={cn("h-1/2 w-full rounded-sm opacity-60", tpl.colors[1])} />
                     <div className={cn("h-4 w-5/6 rounded-sm opacity-80", tpl.colors[0])} />

@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "url-to-tiktok-video-tauri",
+  "productName": "ClipNews",
   "version": "0.1.0",
   "identifier": "com.solo.urlvideotool",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "url-to-tiktok-video-tauri",
+        "title": "ClipNews",
         "width": 1100,
         "height": 800,
         "minWidth": 900,

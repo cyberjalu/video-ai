@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "../lib/cn";
 import type { UiStep } from "../lib/generation";
 import { Card } from "./Card";
+import { SecondaryButton } from "./Buttons";
 
 function formatElapsed(ms: number) {
   const sec = Math.max(0, Math.floor(ms / 1000));
@@ -16,11 +17,13 @@ export function GenerationStepper({
   progressPercent,
   elapsedMs,
   currentDescription,
+  onCancel,
 }: {
   steps: UiStep[];
   progressPercent: number;
   elapsedMs: number;
   currentDescription?: string;
+  onCancel?: () => void;
 }) {
   return (
     <Card variant="strong" className="overflow-hidden p-6">
@@ -30,12 +33,19 @@ export function GenerationStepper({
           <div className="eyebrow-label mb-2">Broadcast Pipeline</div>
           <div className="display-title text-[28px] leading-none text-zinc-100">Rendering in progress</div>
         </div>
-        <div className="rounded-2xl border border-white/[0.07] bg-white/[0.03] px-3 py-2 text-right">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-600">Signal</div>
-          <div className="mt-1 flex items-center gap-3 text-xs text-zinc-500">
-            <span>{formatElapsed(elapsedMs)}</span>
-            <span className="font-bold text-zinc-200">{progressPercent}%</span>
+        <div className="flex flex-col items-end gap-2">
+          <div className="rounded-2xl border border-white/[0.07] bg-white/[0.03] px-3 py-2 text-right">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-600">Signal</div>
+            <div className="mt-1 flex items-center gap-3 text-xs text-zinc-500">
+              <span>{formatElapsed(elapsedMs)}</span>
+              <span className="font-bold text-zinc-200">{progressPercent}%</span>
+            </div>
           </div>
+          {onCancel ? (
+            <SecondaryButton type="button" onClick={onCancel} className="text-xs">
+              Cancel
+            </SecondaryButton>
+          ) : null}
         </div>
       </div>
 

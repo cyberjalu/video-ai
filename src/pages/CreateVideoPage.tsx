@@ -1,4 +1,4 @@
-import { AlertTriangle, Clapperboard, Play } from "lucide-react";
+import { AlertTriangle, Clapperboard, Play, Images } from "lucide-react";
 import { motion } from "framer-motion";
 import { ArticlePreviewCard } from "../components/ArticlePreviewCard";
 import { GenerationStepper } from "../components/GenerationStepper";
@@ -7,24 +7,22 @@ import { InputModeCard, type InputMode } from "../components/InputModeCard";
 import { VideoPreviewCard } from "../components/VideoPreviewCard";
 import { EmptyState } from "../components/EmptyState";
 import { PageTransition } from "../components/PageTransition";
+import { PrimaryButton, SecondaryButton } from "../components/Buttons";
+import { Card } from "../components/Card";
 import type { UiStep } from "../lib/generation";
 import type { GenerationStatus, VideoPlan } from "../lib/types";
 
 function VideoPlaceholder() {
   return (
     <div className="flex h-full min-h-[260px] flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-white/[0.12] bg-white/[0.02] p-6">
-      {/* Phone frame outline */}
       <div
         className="relative flex items-center justify-center rounded-[18px] border border-white/[0.13] bg-[#0d0d10]"
         style={{ width: 88, height: 156 }}
       >
-        {/* Notch */}
         <div className="absolute top-2.5 left-1/2 -translate-x-1/2 h-1.5 w-7 rounded-full bg-white/10" />
-        {/* Play icon */}
         <div className="grid h-8 w-8 place-items-center rounded-full border border-white/10 bg-white/[0.06] text-zinc-600">
           <Play className="h-3.5 w-3.5 ml-0.5" />
         </div>
-        {/* Bottom home indicator */}
         <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 h-1 w-7 rounded-full bg-white/10" />
       </div>
       <div className="text-center">
@@ -59,10 +57,15 @@ export function CreateVideoPage({
   mp4Path,
   outputDir,
   plan,
+  onPlanChange,
   captionText,
   errorMessage,
   onCreateAnother,
   onCopyCaption,
+  onCancel,
+  onContinueRender,
+  onRerender,
+  hasPexelsKey,
 }: {
   inputMode: InputMode;
   onChangeMode: (mode: InputMode) => void;
@@ -87,18 +90,24 @@ export function CreateVideoPage({
   mp4Path?: string | null;
   outputDir?: string | null;
   plan?: VideoPlan | null;
+  onPlanChange?: (plan: VideoPlan) => void;
   captionText?: string | null;
   errorMessage?: string | null;
   onCreateAnother: () => void;
   onCopyCaption: () => void;
+  onCancel?: () => void;
+  onContinueRender?: () => void;
+  onRerender?: () => void;
+  hasPexelsKey?: boolean;
 }) {
   const showProgress = status !== "idle";
   const showArticle = !!articleTitle && status !== "idle";
   const showErrorPanel = status === "failed" && !!errorMessage;
+  const awaiting = status === "awaiting_assets";
+  const editablePlan = awaiting || status === "completed";
 
   return (
     <PageTransition className="mx-auto w-full max-w-[1260px]">
-      {/* Hero input — full width */}
       <InputModeCard
         inputMode={inputMode}
         onChangeMode={onChangeMode}
@@ -113,9 +122,7 @@ export function CreateVideoPage({
         error={urlError ?? null}
       />
 
-      {/* 2-column layout */}
       <div className="mt-8 grid gap-6 lg:grid-cols-12">
-        {/* Left column: progress + article + scenes */}
         <div className="space-y-6 lg:col-span-7">
           {showProgress ? (
             <motion.div
@@ -128,15 +135,35 @@ export function CreateVideoPage({
                 progressPercent={progressPercent}
                 elapsedMs={elapsedMs}
                 currentDescription={progressDescription}
+                onCancel={isBusy ? onCancel : undefined}
               />
             </motion.div>
           ) : (
             <EmptyState
               title="Ready when you are"
-              description="Enter a news URL or a text prompt. We'll extract content, write the script, record voiceover, and render your TikTok video automatically."
+              description="Paste any news URL or a prompt. ClipNews extracts content, writes a script, generates voiceover, and renders a short-form video."
               icon={<Clapperboard className="h-4 w-4" />}
             />
           )}
+
+          {awaiting && onContinueRender ? (
+            <Card className="p-5">
+              <div className="flex items-start gap-3">
+                <Images className="mt-0.5 h-5 w-5 shrink-0 text-cyan-300" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold text-zinc-100">Attach visuals</div>
+                  <div className="mt-1 text-sm text-zinc-400">
+                    Upload image/video per scene below, or continue — empty scenes fill from Pexels
+                    {hasPexelsKey ? "." : " (add API key in Settings)."}
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <PrimaryButton onClick={onContinueRender}>Continue render</PrimaryButton>
+                    <SecondaryButton onClick={onContinueRender}>Skip &amp; render</SecondaryButton>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          ) : null}
 
           {showArticle ? (
             <ArticlePreviewCard
@@ -148,7 +175,12 @@ export function CreateVideoPage({
             />
           ) : null}
 
-          <ScenePlanPanel plan={plan} />
+          <ScenePlanPanel
+            plan={plan}
+            editable={editablePlan}
+            projectDir={outputDir}
+            onPlanChange={onPlanChange}
+          />
 
           {showErrorPanel ? (
             <motion.div
@@ -165,7 +197,6 @@ export function CreateVideoPage({
           ) : null}
         </div>
 
-        {/* Right column: video preview */}
         <div className="lg:col-span-5 h-full">
           {mp4Path ? (
             <VideoPreviewCard
@@ -178,6 +209,7 @@ export function CreateVideoPage({
               captionText={captionText ?? null}
               onCreateAnother={onCreateAnother}
               onCopyCaption={onCopyCaption}
+              onRerender={onRerender}
             />
           ) : (
             <VideoPlaceholder />

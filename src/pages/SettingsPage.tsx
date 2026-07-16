@@ -1,9 +1,7 @@
-import { KeyRound, Palette, Save, Speaker, Folder, Ticket } from "lucide-react";
+import { KeyRound, Palette, Save, Speaker, Folder, LayoutGrid } from "lucide-react";
 import { Card } from "../components/Card";
-import { Badge } from "../components/Badge";
-import { PrimaryButton, SecondaryButton } from "../components/Buttons";
-import type { RenderOptions } from "../lib/types";
-
+import { PrimaryButton } from "../components/Buttons";
+import type { LayoutMode, RenderOptions } from "../lib/types";
 import { PageTransition } from "../components/PageTransition";
 
 export function SettingsPage({
@@ -11,9 +9,6 @@ export function SettingsPage({
   onChangeGeminiKey,
   pexelsKey,
   onChangePexelsKey,
-  licenseKey,
-  onChangeLicenseKey,
-  licenseStatus,
   options,
   onChangeOptions,
   onSave,
@@ -22,9 +17,6 @@ export function SettingsPage({
   onChangeGeminiKey: (v: string) => void;
   pexelsKey: string;
   onChangePexelsKey: (v: string) => void;
-  licenseKey: string;
-  onChangeLicenseKey: (v: string) => void;
-  licenseStatus: "Activated" | "Trial" | "Locked";
   options: RenderOptions;
   onChangeOptions: (v: RenderOptions) => void;
   onSave: () => void;
@@ -32,24 +24,12 @@ export function SettingsPage({
   return (
     <PageTransition className="mx-auto w-full max-w-[980px] space-y-5">
       <Card className="p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="text-lg font-semibold text-zinc-100">Settings</div>
-            <div className="mt-1 text-sm text-zinc-400">
-              Configure ClipNews AI. Keys are stored locally on this device.
-            </div>
+        <div>
+          <div className="text-lg font-semibold text-zinc-100">Settings</div>
+          <div className="mt-1 text-sm text-zinc-400">
+            Configure ClipNews. API keys are stored locally in this browser profile (localStorage).
+            ClipNews is free and open source — no license key required.
           </div>
-          <Badge
-            className={
-              licenseStatus === "Activated"
-                ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-200"
-                : licenseStatus === "Locked"
-                  ? "border-red-400/20 bg-red-400/10 text-red-200"
-                  : "border-white/10 bg-white/5 text-zinc-200"
-            }
-          >
-            {licenseStatus}
-          </Badge>
         </div>
       </Card>
 
@@ -72,7 +52,7 @@ export function SettingsPage({
               type="password"
             />
             <div className="text-xs text-zinc-400">
-              ClipNews AI never shows a built-in master key. Use your own key, or activate a license when available.
+              Required for script planning and TTS. Get a key at Google AI Studio.
             </div>
           </label>
 
@@ -88,8 +68,30 @@ export function SettingsPage({
               spellCheck={false}
               type="password"
             />
-            <div className="text-xs text-zinc-400">
-              Add a Pexels API key if you want to pull stock footage instead of generating images.
+            <div className="text-xs text-zinc-400 space-y-1.5">
+              <p>
+                Used to auto-fill empty scenes with stock photos and videos. Get a free key at{" "}
+                <a
+                  href="https://www.pexels.com/api/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-cyan-300 underline-offset-2 hover:underline"
+                >
+                  pexels.com/api
+                </a>
+                .
+              </p>
+              <p>
+                <a
+                  href="https://www.pexels.com"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-cyan-300 underline-offset-2 hover:underline"
+                >
+                  Photos provided by Pexels
+                </a>
+                . Credit photographers when possible. Default rate limit: 200 requests/hour.
+              </p>
             </div>
           </label>
         </div>
@@ -97,51 +99,14 @@ export function SettingsPage({
 
       <Card className="p-6">
         <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
-          <Ticket className="h-4 w-4 text-zinc-300" />
-          License
+          <Folder className="h-4 w-4 text-zinc-300" />
+          Output folder
         </div>
-        <div className="mt-4 grid gap-3">
-          <label className="grid gap-2">
-            <div className="text-xs font-semibold text-zinc-300">License key</div>
-            <input
-              value={licenseKey}
-              onChange={(e) => onChangeLicenseKey(e.currentTarget.value)}
-              className="rounded-lg border border-white/10 bg-black/30 px-4 py-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-cyan-400/50"
-              placeholder="XXXX-XXXX-XXXX…"
-              autoCapitalize="characters"
-              autoCorrect="off"
-              spellCheck={false}
-              type="password"
-            />
-          </label>
-          <div className="flex flex-wrap gap-2">
-            <SecondaryButton disabled>
-              <Ticket className="h-4 w-4" />
-              Activate
-            </SecondaryButton>
-            <div className="text-xs text-zinc-400">
-              Activation flow is a placeholder in this UI pass.
-            </div>
-          </div>
+        <div className="mt-3 text-sm text-zinc-400">
+          Videos are saved under the project <code className="text-zinc-300">./output</code> directory
+          (next to the repo root when running from source).
         </div>
       </Card>
-
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Card className="p-6">
-          <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
-            <Folder className="h-4 w-4 text-zinc-300" />
-            Output folder
-          </div>
-          <div className="mt-3 text-sm text-zinc-400">
-            Videos are saved in the app’s output directory. Folder selection UI can be wired later.
-          </div>
-          <div className="mt-4">
-            <SecondaryButton disabled className="w-full justify-center">
-              Choose folder
-            </SecondaryButton>
-          </div>
-        </Card>
-      </div>
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Card className="p-6">
@@ -173,7 +138,8 @@ export function SettingsPage({
               </select>
             </label>
           </div>
-        </Card>        <Card className="p-6">
+        </Card>
+        <Card className="p-6">
           <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
             <Speaker className="h-4 w-4 text-zinc-300" />
             Voice style
@@ -227,7 +193,7 @@ export function SettingsPage({
             <select
               value={options.preset}
               onChange={(e) => onChangeOptions({ ...options, preset: e.currentTarget.value as RenderOptions["preset"] })}
-              className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-cyan-400/30"
+              className="rounded-lg border border-white/10 bg-black/30 px-4 py-3 text-sm text-zinc-200 focus:outline-none focus:border-cyan-400/50"
             >
               <option value="deep_explainer">Deep explainer (80–120s)</option>
               <option value="news_60_80">News explainer (60–80s)</option>
@@ -239,17 +205,42 @@ export function SettingsPage({
 
         <Card className="p-6">
           <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
-            <Palette className="h-4 w-4 text-zinc-300" />
-            Theme
+            <LayoutGrid className="h-4 w-4 text-zinc-300" />
+            Layout & overlays
           </div>
-          <div className="mt-4 grid gap-2">
-            <select
-              disabled
-              className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-zinc-200"
-            >
-              <option>Dark (default)</option>
-            </select>
-            <div className="text-xs text-zinc-400">Theme switcher is a placeholder in this UI pass.</div>
+          <div className="mt-4 grid gap-4">
+            <label className="grid gap-2">
+              <div className="text-xs font-semibold text-zinc-300">Layout mode</div>
+              <select
+                value={options.layout_mode}
+                onChange={(e) =>
+                  onChangeOptions({ ...options, layout_mode: e.currentTarget.value as LayoutMode })
+                }
+                className="rounded-lg border border-white/10 bg-black/30 px-4 py-3 text-sm text-zinc-200 focus:outline-none focus:border-cyan-400/50"
+              >
+                <option value="tri">Tri (screenshot / callout / split + b-roll)</option>
+                <option value="dual">Dual</option>
+                <option value="mono">Mono (screenshot / b-roll)</option>
+              </select>
+            </label>
+            <label className="flex items-center gap-3 text-sm text-zinc-300">
+              <input
+                type="checkbox"
+                checked={options.enable_callouts}
+                onChange={(e) => onChangeOptions({ ...options, enable_callouts: e.currentTarget.checked })}
+                className="h-4 w-4 rounded border-white/20 bg-black/40"
+              />
+              Enable callout chips
+            </label>
+            <label className="flex items-center gap-3 text-sm text-zinc-300">
+              <input
+                type="checkbox"
+                checked={options.enable_progress}
+                onChange={(e) => onChangeOptions({ ...options, enable_progress: e.currentTarget.checked })}
+                className="h-4 w-4 rounded border-white/20 bg-black/40"
+              />
+              Enable progress bar in video
+            </label>
           </div>
         </Card>
       </div>
@@ -266,4 +257,3 @@ export function SettingsPage({
     </PageTransition>
   );
 }
-

@@ -3,7 +3,7 @@ import { History, FolderOpen } from "lucide-react";
 import { EmptyState } from "../components/EmptyState";
 import { Card } from "../components/Card";
 import { Badge } from "../components/Badge";
-import { listOutputDirs, readTextFileSafe } from "../lib/tauri";
+import { listOutputDirs, pathExists, readTextFileSafe } from "../lib/tauri";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import type { VideoPlan } from "../lib/types";
 import { SecondaryButton } from "../components/Buttons";
@@ -35,17 +35,28 @@ export function HistoryPage() {
 
         for (const dir of dirs) {
           // dir might be absolute path depending on Rust implementation
-          const folderName = dir.split("/").pop() || dir;
-          
+          const folderName = dir.split(/[/\\]/).pop() || dir;
+
           let planData: VideoPlan | null = null;
           let status: "Completed" | "Incomplete" = "Incomplete";
 
           try {
             const planStr = await readTextFileSafe(`${dir}/plan/video_plan.json`);
             planData = JSON.parse(planStr) as VideoPlan;
-            status = "Completed"; // simplistic check, you'd check out.mp4 in production
-          } catch (e) {
+          } catch {
             // ignore
+          }
+
+          const mp4Candidates = [`${dir}/render/out.mp4`, `${dir}/render/final.mp4`, `${dir}/out.mp4`];
+          for (const mp4 of mp4Candidates) {
+            try {
+              if (await pathExists(mp4)) {
+                status = "Completed";
+                break;
+              }
+            } catch {
+              // ignore
+            }
           }
 
           // Parse date from "2026-05-13__1303__..."

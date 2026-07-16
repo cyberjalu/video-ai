@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
-import { AbsoluteFill, Audio, Img, Sequence, Video, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Audio, Sequence, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import { SceneVisual } from "../components/SceneVisuals";
 
 // Montserrat (includes Vietnamese glyphs via latin-ext)
 import "@fontsource/montserrat/400.css";
@@ -40,47 +41,6 @@ export const CorporateBg: React.FC = () => {
 };
 
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
-
-const Watermarks: React.FC = () => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const t = frame / fps;
-  const floatY = Math.sin(t * 0.8) * 2;
-  const glow = 0.2 + (Math.sin(t * 1.2) + 1) * 0.05;
-
-  const badgeBase: React.CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    padding: "10px 14px",
-    borderRadius: 8,
-    background: "rgba(15,23,42,0.60)",
-    border: "1px solid rgba(148,163,184,0.2)",
-    boxShadow: `0 4px 12px rgba(0,0,0,0.5)`,
-    backdropFilter: "blur(10px)",
-    color: "#e2e8f0",
-    fontSize: 20,
-    fontWeight: 600,
-    letterSpacing: 0.2,
-    transform: `translateY(${floatY}px)`,
-  };
-
-  return (
-    <div style={{ pointerEvents: "none", width: "100%", maxWidth: 920 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
-        <div style={badgeBase}>@radiobaomat</div>
-        <div
-          style={{
-            ...badgeBase,
-          }}
-        >
-          <span style={{ color: "#94a3b8" }}>♥</span>
-          <span>i-love-tiktok</span>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const ProgressBadge: React.FC<{ index: number; total: number }> = ({ index, total }) => {
   return (
@@ -154,103 +114,6 @@ const CalloutChips: React.FC<{ items: string[]; frame: number; enabled: boolean 
   );
 };
 
-const VisualCard: React.FC<{ src?: string; brollSrc?: string; layout?: string; frame: number; height: number }> = ({ src, brollSrc, layout, frame, height }) => {
-  if (layout === "broll" && brollSrc) {
-    return (
-      <div
-        style={{
-          width: "100%",
-          maxWidth: 920,
-          height,
-          borderRadius: 12,
-          overflow: "hidden",
-          position: "relative",
-          border: "1px solid rgba(148,163,184,0.18)",
-          boxShadow:
-            "0 18px 55px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,255,255,0.06) inset",
-          background: "rgba(15,23,42,0.4)",
-        }}
-      >
-        <Video
-          src={brollSrc}
-          muted
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            background: "linear-gradient(180deg, rgba(0,0,0,0.10) 0%, rgba(0,0,0,0.55) 100%)",
-          }}
-        />
-      </div>
-    );
-  }
-
-  if (!src) return null;
-  const t = interpolate(frame, [0, 20], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const translateY = interpolate(t, [0, 1], [15, 0]);
-  const opacity = interpolate(t, [0, 0.25, 1], [0, 1, 1]);
-  return (
-    <div
-      style={{
-        width: "100%",
-        maxWidth: 920,
-        height,
-        borderRadius: 12,
-        overflow: "hidden",
-        position: "relative",
-        border: "1px solid rgba(148,163,184,0.18)",
-        boxShadow:
-          "0 18px 55px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,255,255,0.06) inset",
-        background: "rgba(15,23,42,0.4)",
-        transform: `translateY(${translateY}px)`,
-        opacity,
-      }}
-    >
-      <Img
-        src={src}
-        style={{
-          position: "absolute",
-          inset: 0,
-          width: "100%",
-          height: "100%",
-          objectFit: "cover",
-          filter: "blur(18px) brightness(0.7)",
-          opacity: 0.6,
-          transform: "scale(1.08)",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: 20,
-        }}
-      >
-        <Img
-          src={src}
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "contain",
-          }}
-        />
-      </div>
-    </div>
-  );
-};
-
 const CutFlashOverlay: React.FC<{ cutFrames: number[] }> = ({ cutFrames }) => {
   const frame = useCurrentFrame();
   let intensity = 0;
@@ -280,6 +143,7 @@ const SceneView: React.FC<{
   showCallouts: boolean;
 }> = ({ scene, sceneIndex, totalScenes, showProgress, showCallouts }) => {
   const frame = useCurrentFrame();
+  const { durationInFrames } = useVideoConfig();
 
   const caption = scene.caption_lines.join("\n");
   const fontSize = clamp(48 - Math.max(0, caption.length - 70) * 0.35, 30, 48);
@@ -310,40 +174,24 @@ const SceneView: React.FC<{
         }}
       >
         {showProgress ? <ProgressBadge index={sceneIndex} total={totalScenes} /> : null}
-        <Watermarks />
-
-        {layout === "big_callout" ? (
-          <div
-            style={{
-              width: "100%",
-              maxWidth: 920,
-              borderRadius: 20,
-              border: "1px solid rgba(148,163,184,0.3)",
-              background: "rgba(15,23,42,0.8)",
-              padding: "40px 30px",
-              boxShadow: "0 24px 50px rgba(0,0,0,0.52)",
-            }}
-          >
-            <div
-              style={{
-                color: "#f8fafc",
-                fontSize: clamp(64 - Math.max(0, bigCalloutText.length - 16) * 0.5, 42, 64),
-                fontWeight: 700,
-                lineHeight: 1.08,
-                textShadow: "0 4px 12px rgba(0,0,0,0.6)",
-              }}
-            >
-              {bigCalloutText}
-            </div>
-          </div>
-        ) : (
-          <VisualCard src={scene.screenshot_src} brollSrc={scene.broll_src} layout={layout} frame={frame} height={cardHeight} />
-        )}
+        <SceneVisual
+          layout={layout}
+          screenshotSrc={scene.screenshot_src}
+          brollSrc={scene.broll_src}
+          stat={scene.stat}
+          chart={scene.chart}
+          calloutText={bigCalloutText}
+          imageFit={scene.image_fit}
+          frame={frame}
+          height={cardHeight}
+          durationInFrames={durationInFrames}
+          theme="corporate"
+        />
 
         <CalloutChips
           items={callouts}
           frame={frame}
-          enabled={showCallouts && layout === "big_callout"}
+          enabled={showCallouts && (layout === "big_callout" || layout === "stat")}
         />
 
         <div

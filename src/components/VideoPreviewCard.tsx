@@ -50,6 +50,7 @@ export function VideoPreviewCard({
   captionText,
   onCreateAnother,
   onCopyCaption,
+  onRerender,
 }: {
   title?: string;
   source?: string;
@@ -60,6 +61,7 @@ export function VideoPreviewCard({
   captionText?: string | null;
   onCreateAnother: () => void;
   onCopyCaption: () => void;
+  onRerender?: () => void;
 }) {
   if (!mp4Path) {
     return <EmptyPreview />;
@@ -232,6 +234,12 @@ export function VideoPreviewCard({
               Copy Caption
             </SecondaryButton>
           </div>
+          {onRerender ? (
+            <SecondaryButton onClick={onRerender} className="w-full justify-center text-xs">
+              <RotateCcw className="h-3.5 w-3.5" />
+              Re-render with assets
+            </SecondaryButton>
+          ) : null}
         </div>
       </Card>
     </motion.div>

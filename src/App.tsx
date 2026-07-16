@@ -23,14 +23,12 @@ import {
 import {
   loadGeminiKey,
   loadPexelsKey,
-  loadLicenseKey,
   loadRenderOptions,
   saveGeminiKey,
   savePexelsKey,
-  saveLicenseKey,
   saveRenderOptions,
 } from "./lib/storage";
-import { startRender, readTextFileSafe } from "./lib/tauri";
+import { cancelRender, startRender, readTextFileSafe, writePlanJson } from "./lib/tauri";
 import { parseWorkerEventLine } from "./lib/workerEvents";
 import type { AppPage, GenerationStatus, RenderOptions, VideoPlan } from "./lib/types";
 import type { UiStep } from "./lib/generation";
@@ -53,21 +51,17 @@ function AppInner() {
   // ─── Persistent Settings ─────────────────────────────────────────────────────
   const [geminiKey, setGeminiKey] = useState("");
   const [pexelsKey, setPexelsKey] = useState("");
-  const [licenseKey, setLicenseKey] = useState("");
   const [options, setOptions] = useState<RenderOptions>(loadRenderOptions());
-  const licenseStatus: "Activated" | "Trial" | "Locked" = licenseKey ? "Activated" : "Trial";
 
   useEffect(() => {
     setGeminiKey(loadGeminiKey());
     setPexelsKey(loadPexelsKey());
-    setLicenseKey(loadLicenseKey());
     setOptions(loadRenderOptions());
   }, []);
 
   function handleSaveSettings() {
     saveGeminiKey(geminiKey);
     savePexelsKey(pexelsKey);
-    saveLicenseKey(licenseKey);
     saveRenderOptions(options);
     toast({ title: "Settings saved", variant: "success" });
   }
@@ -75,7 +69,7 @@ function AppInner() {
   // ─── Generation State ─────────────────────────────────────────────────────
   const [inputMode, setInputMode] = useState<"url" | "prompt">("url");
   const [promptText, setPromptText] = useState("");
-  const [url, setUrl] = useState("https://openai.com/index/gpt-5-5-with-trusted-access-for-cyber/");
+  const [url, setUrl] = useState("");
   const [audioPath, setAudioPath] = useState("");
   const [scriptText, setScriptText] = useState("");
   const [urlError, setUrlError] = useState<string | null>(null);
@@ -97,8 +91,13 @@ function AppInner() {
   const [outputDir, setOutputDir] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [progressDescription, setProgressDescription] = useState<string | undefined>(undefined);
+  const activeStageRef = useRef<"plan" | "render" | "full">("plan");
 
-  const isBusy = status !== "idle" && status !== "completed" && status !== "failed";
+  const isBusy =
+    status !== "idle" &&
+    status !== "completed" &&
+    status !== "failed" &&
+    status !== "awaiting_assets";
   const progressPercent = deriveProgressPercent(steps);
 
   // ─── Tauri Event Listeners ────────────────────────────────────────────────
@@ -122,6 +121,18 @@ function AppInner() {
           if (newStatus) setStatus(newStatus);
           return next;
         });
+
+        if (event.type === "error") {
+          stopTimer();
+          setStatus("failed");
+          setErrorMessage(event.message || friendlyErrorMessage("Generation failed"));
+          toast({
+            title: "Generation failed",
+            description: event.message || "Unknown error",
+            variant: "error",
+          });
+          return;
+        }
 
         // Extract rich metadata from events
         if (event.type === "step_start" && event.step === "extract") {
@@ -172,10 +183,38 @@ function AppInner() {
             setSuggestedDurationSec((prev) => prev ?? p.target_duration_sec);
           }
         }
+
+        if (event.type === "plan_ready") {
+          stopTimer();
+          setStatus("awaiting_assets");
+          setOutputDir(event.projectDir);
+          if (event.plan) {
+            setPlan(event.plan);
+            setArticleTitle((prev) => prev ?? event.plan.title);
+            setSuggestedScenes((prev) => prev ?? event.plan.scenes.length);
+            setSuggestedDurationSec((prev) => prev ?? event.plan.target_duration_sec);
+          }
+          setProgressDescription("Attach visuals per scene, or continue — Pexels fills empty scenes.");
+          toast({
+            title: "Scene plan ready",
+            description: "Add images/videos or continue to auto-fill from Pexels.",
+            variant: "success",
+          });
+        }
+
+        if (event.type === "done" && event.planReady) {
+          stopTimer();
+          setStatus("awaiting_assets");
+          if (event.projectDir) setOutputDir(event.projectDir);
+        }
       });
 
       // render_done
       un2 = await listen<number>("render_done", () => {
+        if (activeStageRef.current === "plan") {
+          // Worker finished plan stage successfully; awaiting_assets already set via plan_ready
+          return;
+        }
         stopTimer();
         setStatus("completed");
         setProgressDescription("Your video is ready!");
@@ -187,8 +226,9 @@ function AppInner() {
         stopTimer();
         setSteps((prev) => prev.map((s) => (s.state === "running" ? { ...s, state: "failed" } : s)));
         setStatus("failed");
-        setErrorMessage(friendlyErrorMessage(e.payload));
-        toast({ title: "Generation failed", description: friendlyErrorMessage(e.payload), variant: "error" });
+        const msg = e.payload?.trim() ? e.payload : "Generation failed";
+        setErrorMessage(friendlyErrorMessage(msg));
+        toast({ title: "Generation failed", description: msg, variant: "error" });
       });
     })();
 
@@ -220,7 +260,7 @@ function AppInner() {
   // After outputDir is known, try to load plan.json
   useEffect(() => {
     if (!outputDir || plan) return;
-    const planPath = `${outputDir}/video_plan.json`;
+    const planPath = `${outputDir}/plan/video_plan.json`;
     readTextFileSafe(planPath)
       .then((raw) => {
         try {
@@ -351,6 +391,10 @@ function AppInner() {
 
     setStatus("reading_article");
     startTimer();
+    activeStageRef.current = "plan";
+
+    const renderOptions: RenderOptions =
+      page === "youtube" ? { ...options, template: "YouTubeStoryV1" } : options;
 
     try {
       await startRender({
@@ -361,7 +405,8 @@ function AppInner() {
         platform: page === "youtube" ? "youtube" : undefined,
         geminiApiKey: key,
         pexelsApiKey: pexelsKey,
-        options,
+        options: renderOptions,
+        stage: "plan",
       });
     } catch (e) {
       stopTimer();
@@ -370,7 +415,95 @@ function AppInner() {
       setSteps((prev) => prev.map((s) => (s.state === "running" ? { ...s, state: "failed" } : s)));
       toast({ title: "Failed to start", description: String(e), variant: "error" });
     }
-  }, [url, promptText, inputMode, audioPath, scriptText, page, options, toast]);
+  }, [url, promptText, inputMode, audioPath, scriptText, page, options, pexelsKey, toast]);
+
+  async function handleContinueRender() {
+    if (!outputDir) {
+      toast({ title: "Missing project", description: "No project folder from plan stage.", variant: "error" });
+      return;
+    }
+    const key = loadGeminiKey();
+    if (!key) {
+      setPage("settings");
+      toast({ title: "API key required", description: "Add your Gemini API key in Settings.", variant: "error" });
+      return;
+    }
+
+    const emptyVisuals =
+      plan?.scenes.filter(
+        (s) =>
+          s.layout !== "big_callout" &&
+          s.layout !== "bar_chart" &&
+          !s.screenshot_path &&
+          !s.broll_path,
+      ).length ?? 0;
+    if (emptyVisuals > 0 && !pexelsKey.trim()) {
+      toast({
+        title: "Pexels key recommended",
+        description: `${emptyVisuals} scene(s) have no assets. Add a Pexels API key in Settings for auto-fill, or upload files.`,
+        variant: "error",
+      });
+    }
+
+    if (plan) {
+      try {
+        await writePlanJson(outputDir, plan);
+      } catch (e) {
+        toast({ title: "Could not save plan", description: String(e), variant: "error" });
+        return;
+      }
+    }
+
+    setMp4Path(null);
+    setErrorMessage(null);
+    setStatus("generating_voiceover");
+    setProgressDescription("Fetching stock media and rendering…");
+    setSteps((prev) =>
+      prev.map((s) => {
+        if (s.id === "awaiting_assets") return { ...s, state: "completed" };
+        if (s.id === "generating_voiceover") return { ...s, state: "running" };
+        return s;
+      }),
+    );
+    startTimer();
+    activeStageRef.current = "render";
+
+    const renderOptions: RenderOptions =
+      page === "youtube" ? { ...options, template: "YouTubeStoryV1" } : options;
+
+    try {
+      await startRender({
+        geminiApiKey: key,
+        pexelsApiKey: pexelsKey,
+        options: renderOptions,
+        stage: "render",
+        projectDir: outputDir,
+        planFile: `${outputDir}/plan/video_plan.json`,
+        platform: page === "youtube" ? "youtube" : undefined,
+      });
+    } catch (e) {
+      stopTimer();
+      setStatus("failed");
+      setErrorMessage(friendlyErrorMessage(String(e)));
+      toast({ title: "Failed to continue", description: String(e), variant: "error" });
+    }
+  }
+
+  async function handleRerenderWithAssets() {
+    await handleContinueRender();
+  }
+  async function handleCancel() {
+    try {
+      await cancelRender();
+      stopTimer();
+      setStatus("failed");
+      setErrorMessage("Cancelled by user");
+      setSteps((prev) => prev.map((s) => (s.state === "running" ? { ...s, state: "failed" } : s)));
+      toast({ title: "Cancelled", description: "Render job was cancelled.", variant: "error" });
+    } catch (e) {
+      toast({ title: "Cancel failed", description: String(e), variant: "error" });
+    }
+  }
 
   function handleCreateAnother() {
     setStatus("idle");
@@ -415,11 +548,7 @@ function AppInner() {
   return (
     <AppShell
       sidebar={
-        <Sidebar
-          active={page}
-          onNavigate={setPage}
-          licenseStatus={licenseStatus}
-        />
+        <Sidebar active={page} onNavigate={setPage} />
       }
       topbar={
         <TopBar
@@ -451,10 +580,15 @@ function AppInner() {
               mp4Path={mp4Path}
               outputDir={outputDir}
               plan={plan}
+              onPlanChange={setPlan}
               captionText={captionText}
               errorMessage={errorMessage}
               onCreateAnother={handleCreateAnother}
               onCopyCaption={handleCopyCaption}
+              onCancel={handleCancel}
+              onContinueRender={handleContinueRender}
+              onRerender={handleRerenderWithAssets}
+              hasPexelsKey={Boolean(pexelsKey.trim())}
             />
           )}
 
@@ -483,10 +617,15 @@ function AppInner() {
               mp4Path={mp4Path}
               outputDir={outputDir}
               plan={plan}
+              onPlanChange={setPlan}
               captionText={captionText}
               errorMessage={errorMessage}
               onCreateAnother={handleCreateAnother}
               onCopyCaption={handleCopyCaption}
+              onCancel={handleCancel}
+              onContinueRender={handleContinueRender}
+              onRerender={handleRerenderWithAssets}
+              hasPexelsKey={Boolean(pexelsKey.trim())}
             />
           )}
 
@@ -518,9 +657,6 @@ function AppInner() {
               onChangeGeminiKey={setGeminiKey}
               pexelsKey={pexelsKey}
               onChangePexelsKey={setPexelsKey}
-              licenseKey={licenseKey}
-              onChangeLicenseKey={setLicenseKey}
-              licenseStatus={licenseStatus}
               options={options}
               onChangeOptions={setOptions}
               onSave={handleSaveSettings}

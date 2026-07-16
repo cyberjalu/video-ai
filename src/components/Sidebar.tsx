@@ -24,11 +24,9 @@ const NAV: NavItem[] = [
 export function Sidebar({
   active,
   onNavigate,
-  licenseStatus,
 }: {
   active: AppPage;
   onNavigate: (p: AppPage) => void;
-  licenseStatus: "Activated" | "Trial" | "Locked";
 }) {
   return (
     <div className="relative flex h-full flex-col overflow-hidden">
@@ -114,26 +112,17 @@ export function Sidebar({
         <div className="surface-inset rounded-[20px] p-3.5">
           <div className="eyebrow-label mb-2">System</div>
           <div className="flex items-center justify-between gap-2">
-            <div className="text-sm font-semibold text-zinc-200">License</div>
-            <Badge
-              variant={licenseStatus === "Activated" ? "success" : licenseStatus === "Locked" ? "danger" : "muted"}
-              className={cn(
-                licenseStatus === "Activated"
-                  ? ""
-                  : licenseStatus === "Locked"
-                    ? ""
-                    : "text-amber-200",
-              )}
-            >
-              {licenseStatus}
-            </Badge>
+            <div className="text-sm font-semibold text-zinc-200">Open source</div>
+            <Badge variant="success">MIT</Badge>
           </div>
           <div className="mt-3 rounded-2xl border border-white/[0.05] bg-black/20 px-3 py-2.5">
             <div className="flex items-center justify-between text-[11px] text-zinc-500">
               <span>Version</span>
               <span className="font-medium text-zinc-300">v{pkg.version}</span>
             </div>
-            <div className="mt-1 text-[11px] leading-5 text-zinc-600">Fast desktop pipeline for short-form publishing.</div>
+            <div className="mt-1 text-[11px] leading-5 text-zinc-600">
+              Free article-to-video studio for any news topic.
+            </div>
           </div>
         </div>
       </div>

@@ -6,6 +6,7 @@ const LABELS: Record<GenerationStatus, string> = {
   reading_article: "Reading",
   capturing_screenshots: "Capturing",
   writing_script: "Writing",
+  awaiting_assets: "Attach visuals",
   generating_voiceover: "Voiceover",
   rendering_video: "Rendering",
   finalizing_export: "Finalizing",
@@ -29,7 +30,7 @@ export function StatusPill({
       ? "completed"
       : status === "failed"
         ? "failed"
-        : status === "idle"
+        : status === "idle" || status === "awaiting_assets"
           ? "idle"
           : "running";
 

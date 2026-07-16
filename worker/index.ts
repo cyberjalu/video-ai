@@ -37,9 +37,9 @@ async function planVideoFromScriptWithGemini(script: string, durationSec: number
   emit({ type: "step_start", step: "plan" });
   const ai = new GoogleGenAI({ apiKey: geminiKey });
   
-  const prompt = `Bạn là một đạo diễn video YouTube chuyên nghiệp.
-Nhiệm vụ của bạn là phân tích kịch bản (script) sau đây và chia nó thành các cảnh (scenes).
-Tổng thời lượng của video là đúng ${durationSec.toFixed(1)} giây. Bạn hãy tự phân bổ thời gian (duration_sec) cho từng cảnh sao cho tỷ lệ thuận với độ dài câu thoại, và TỔNG THỜI GIAN CÁC CẢNH PHẢI BẰNG ĐÚNG ${Math.round(durationSec)} giây.
+  const prompt = `Bạn là đạo diễn video TikTok tin tức 9:16 (news explainer).
+Nhiệm vụ: phân tích kịch bản và chia thành các cảnh visual đa dạng (KHÔNG chỉ b-roll).
+Tổng thời lượng đúng ${durationSec.toFixed(1)} giây. Phân bổ duration_sec tỷ lệ với độ dài thoại; TỔNG ≈ ${Math.round(durationSec)} giây.
 
 Kịch bản gốc (Script):
 """
@@ -54,20 +54,26 @@ Yêu cầu output JSON (KHÔNG CÓ MARKDOWN):
     {
       "id": "s1",
       "role": "hook",
-      "duration_sec": 5,
+      "duration_sec": 8,
       "caption_lines": ["Dòng 1", "Dòng 2"],
       "voiceover": "Câu nói tương ứng trong kịch bản",
-      "layout": "broll",
-      "pexels_query": "hacker"
+      "layout": "stat",
+      "stat": { "value": "10/10", "label": "công ty công nghệ dùng AI" },
+      "callouts": ["10/10 dùng AI"],
+      "pexels_query": "office technology"
     }
   ]
 }
 
 Quy tắc:
-- Mọi cảnh PHẢI CÓ layout là "broll".
-- Mọi cảnh PHẢI CÓ pexels_query (1-3 từ khóa tiếng Anh ngắn gọn như "nature", "working", "happy person").
-- caption_lines: trích xuất vài từ khóa ngắn gọn làm phụ đề.
-- voiceover: Lấy CHÍNH XÁC lời thoại từ kịch bản để khớp. KHÔNG ĐƯỢC BỊA THÊM HOẶC SỬA ĐỔI LỜI THOẠI!`;
+- duration_sec PHẢI là số nguyên 3–12 (không thập phân).
+- layout được phép: screenshot|big_callout|stat|bar_chart|broll|split.
+- hook/impact/takeaway → ưu tiên stat hoặc big_callout.
+- evidence → ưu tiên screenshot hoặc bar_chart (kèm chart.bars từ số trong script, không bịa).
+- Không bắt buộc mọi cảnh là broll.
+- Mọi scene không phải big_callout phải có pexels_query (1-3 từ khóa tiếng Anh).
+- caption_lines: từ khóa phụ đề ngắn.
+- voiceover: Lấy CHÍNH XÁC lời thoại từ kịch bản. KHÔNG ĐƯỢC BỊA/SỬA LỜI THOẠI.`;
 
   let lastError = "";
   for (let attempt = 1; attempt <= 2; attempt++) {
@@ -94,6 +100,7 @@ Quy tắc:
         scenes: plan.scenes.length,
         target: plan.target_duration_sec,
         attempt,
+        plan,
       });
       return plan;
     } catch (error) {
@@ -114,6 +121,8 @@ const ArgsSchema = z.object({
   openaiKey: z.string().optional(),
   pexelsKey: z.string().optional(),
   planFile: z.string().optional(),
+  projectDir: z.string().optional(),
+  stage: z.enum(["plan", "render", "full"]).optional(),
   tts: z.enum(["gemini", "openai", "macos"]).optional(),
   outDir: z.string().optional(),
   preset: z.enum(["deep_explainer", "news_60_80", "ultra_25_35"]).optional(),
@@ -124,6 +133,7 @@ const ArgsSchema = z.object({
   voice: z.string().optional(),
   contentModel: z.string().optional(),
   audioModel: z.string().optional(),
+  assetsDir: z.string().optional(),
 });
 
 type SceneRole =
@@ -136,7 +146,7 @@ type SceneRole =
   | "impact"
   | "takeaway";
 
-type SceneLayout = "screenshot" | "big_callout" | "split" | "broll";
+type SceneLayout = "screenshot" | "big_callout" | "split" | "broll" | "stat" | "bar_chart";
 type RenderPreset = "deep_explainer" | "news_60_80" | "ultra_25_35";
 type LayoutMode = "tri" | "dual" | "mono";
 
@@ -150,23 +160,54 @@ type RenderPrefs = {
   audioModel?: string;
 };
 
+const StatSchema = z.object({
+  value: z.string(),
+  label: z.string(),
+  delta: z.string().optional(),
+});
+
+const ChartSchema = z.object({
+  title: z.string().optional(),
+  bars: z
+    .array(
+      z.object({
+        label: z.string(),
+        value: z.coerce.number(),
+      }),
+    )
+    .min(1)
+    .max(5),
+});
+
 const VideoPlanSchema = z.object({
   title: z.string(),
-  target_duration_sec: z.number().int().min(20).max(180),
+  target_duration_sec: z.coerce
+    .number()
+    .transform((n) => Math.round(Number(n)))
+    .pipe(z.number().int().min(20).max(180)),
   audio_prompt: z.string().optional(),
   scenes: z
     .array(
       z.object({
         id: z.string(),
         role: z.custom<SceneRole>(),
-        duration_sec: z.number().int().min(3).max(14),
+        duration_sec: z.coerce
+          .number()
+          .transform((n) => Math.max(3, Math.min(12, Math.round(Number(n)))))
+          .pipe(z.number().int().min(3).max(12)),
         caption_lines: z.array(z.string()).min(1).max(2),
         voiceover: z.string(),
-        layout: z.enum(["screenshot", "big_callout", "split", "broll"]).optional(),
+        layout: z.enum(["screenshot", "big_callout", "split", "broll", "stat", "bar_chart"]).optional(),
         callouts: z.array(z.string()).max(2).optional(),
         screenshot_path: z.string().optional(),
+        screenshot_file: z.string().optional(),
+        image_fit: z.enum(["cover", "contain"]).optional(),
         pexels_query: z.string().optional(),
+        pexels_credit: z.string().optional(),
+        pexels_url: z.string().optional(),
         broll_path: z.string().optional(),
+        stat: StatSchema.optional(),
+        chart: ChartSchema.optional(),
       }),
     )
     .min(4)
@@ -209,6 +250,8 @@ function parseArgs(argv: string[]) {
     openaiKey: out.openaiKey ?? process.env.OPENAI_API_KEY,
     pexelsKey: out.pexelsKey ?? process.env.PEXELS_API_KEY,
     planFile: out.planFile,
+    projectDir: out.projectDir,
+    stage: (out.stage as "plan" | "render" | "full" | undefined) ?? "full",
     tts: out.tts as "gemini" | "openai" | "macos" | undefined,
     outDir: out.outDir,
     preset: out.preset as RenderPreset | undefined,
@@ -219,6 +262,7 @@ function parseArgs(argv: string[]) {
     voice: out.voice,
     contentModel: out.contentModel,
     audioModel: out.audioModel,
+    assetsDir: out.assetsDir,
   });
 }
 
@@ -229,7 +273,42 @@ function toRenderPrefs(args: z.infer<typeof ArgsSchema>): RenderPrefs {
     layoutMode: args.layoutMode ?? "tri",
     enableCallouts: args.enableCallouts ?? true,
     enableProgress: args.enableProgress ?? true,
+    contentModel: args.contentModel,
+    audioModel: args.audioModel,
   };
+}
+
+async function assertBinOnPath(bin: string) {
+  try {
+    await execFileP(bin, ["-version"]);
+  } catch {
+    const tip =
+      process.platform === "win32"
+        ? "Install with Scoop (`scoop install ffmpeg`) or Chocolatey, then reopen the terminal."
+        : "Install with Homebrew (`brew install ffmpeg`), then reopen the terminal.";
+    throw new Error(`Missing required binary "${bin}" on PATH. ${tip}`);
+  }
+}
+
+async function preflightTools() {
+  await assertBinOnPath("ffmpeg");
+  await assertBinOnPath("ffprobe");
+}
+
+async function withRetry<T>(label: string, fn: () => Promise<T>, attempts = 2): Promise<T> {
+  let last: unknown;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      last = e;
+      emit({
+        type: "log",
+        message: `${label} failed (attempt ${i}/${attempts}): ${e instanceof Error ? e.message : String(e)}`,
+      });
+    }
+  }
+  throw last instanceof Error ? last : new Error(String(last));
 }
 
 function emit(event: unknown) {
@@ -253,8 +332,13 @@ async function writeJson(p: string, v: unknown) {
   await fs.writeFile(p, JSON.stringify(v, null, 2), "utf-8");
 }
 
-async function fetchPexelsVideo(query: string, pexelsKey: string, outPath: string, orientation: "portrait" | "landscape" = "portrait"): Promise<string> {
-  const url = `https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&per_page=1&orientation=${orientation}`;
+async function fetchPexelsVideo(
+  query: string,
+  pexelsKey: string,
+  outPath: string,
+  orientation: "portrait" | "landscape" = "portrait",
+): Promise<{ path: string; credit: string; url: string }> {
+  const url = `https://api.pexels.com/v1/videos/search?query=${encodeURIComponent(query)}&per_page=1&orientation=${orientation}`;
   const response = await fetch(url, {
     headers: {
       Authorization: pexelsKey,
@@ -273,7 +357,7 @@ async function fetchPexelsVideo(query: string, pexelsKey: string, outPath: strin
   }
 
   const videoFiles = video.video_files || [];
-  const mp4Files = videoFiles.filter((f: any) => f.file_type === "video/mp4" || f.link.includes(".mp4"));
+  const mp4Files = videoFiles.filter((f: any) => f.file_type === "video/mp4" || f.link?.includes(".mp4"));
   if (mp4Files.length === 0) {
     throw new Error(`No mp4 files found for Pexels video: ${video.id}`);
   }
@@ -292,7 +376,219 @@ async function fetchPexelsVideo(query: string, pexelsKey: string, outPath: strin
   await ensureDir(path.dirname(outPath));
   await fs.writeFile(outPath, buffer);
 
-  return outPath;
+  const user = video.user?.name ?? "Pexels";
+  const pageUrl = video.url ?? `https://www.pexels.com/video/${video.id}/`;
+  return {
+    path: outPath,
+    credit: `Video by ${user} on Pexels`,
+    url: pageUrl,
+  };
+}
+
+async function fetchPexelsPhoto(
+  query: string,
+  pexelsKey: string,
+  outPath: string,
+  orientation: "portrait" | "landscape" = "portrait",
+): Promise<{ path: string; credit: string; url: string }> {
+  const url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=1&orientation=${orientation}`;
+  const response = await fetch(url, {
+    headers: {
+      Authorization: pexelsKey,
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => "");
+    throw new Error(`Pexels Photos API error: HTTP ${response.status} ${errorText.slice(0, 300)}`);
+  }
+
+  const data = (await response.json()) as any;
+  const photo = data?.photos?.[0];
+  if (!photo) {
+    throw new Error(`No photos found on Pexels for query: "${query}"`);
+  }
+
+  const downloadUrl =
+    orientation === "portrait"
+      ? photo.src?.portrait || photo.src?.large2x || photo.src?.large || photo.src?.original
+      : photo.src?.landscape || photo.src?.large2x || photo.src?.large || photo.src?.original;
+  if (!downloadUrl) {
+    throw new Error(`Pexels photo missing src for id ${photo.id}`);
+  }
+
+  const imgRes = await fetch(downloadUrl);
+  if (!imgRes.ok) {
+    throw new Error(`Failed to download Pexels photo: HTTP ${imgRes.status}`);
+  }
+
+  const arrayBuffer = await imgRes.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+  await ensureDir(path.dirname(outPath));
+  await fs.writeFile(outPath, buffer);
+
+  const photographer = photo.photographer ?? "Pexels";
+  const pageUrl = photo.url ?? `https://www.pexels.com/photo/${photo.id}/`;
+  return {
+    path: outPath,
+    credit: `Photo by ${photographer} on Pexels`,
+    url: pageUrl,
+  };
+}
+
+const PHOTO_LAYOUTS = new Set(["screenshot", "split", "stat"]);
+
+async function autoFillPexelsAssets(
+  plan: VideoPlan,
+  pexelsKey: string | undefined,
+  projectDir: string,
+  orientation: "portrait" | "landscape",
+): Promise<VideoPlan> {
+  const pexelsDir = path.join(projectDir, "pexels");
+  await ensureDir(pexelsDir);
+
+  const scenes = [];
+  for (const scene of plan.scenes) {
+    const layout = scene.layout ?? "big_callout";
+    const hasUserShot = Boolean(scene.screenshot_path);
+    const hasUserBroll = Boolean(scene.broll_path);
+    const query = scene.pexels_query?.trim();
+
+    if (layout === "broll") {
+      if (hasUserBroll) {
+        scenes.push(scene);
+        continue;
+      }
+      if (!query || !pexelsKey) {
+        emit({
+          type: "log",
+          step: "fetch_broll",
+          message: !pexelsKey
+            ? `Scene ${scene.id}: no Pexels key — fallback broll → big_callout`
+            : `Scene ${scene.id}: missing pexels_query — fallback broll → big_callout`,
+        });
+        scenes.push({ ...scene, layout: "big_callout" as const });
+        continue;
+      }
+      const outPath = path.join(pexelsDir, `${scene.id}.mp4`);
+      try {
+        emit({ type: "log", step: "fetch_broll", message: `Fetching Pexels video for ${scene.id}: "${query}"` });
+        const result = await fetchPexelsVideo(query, pexelsKey, outPath, orientation);
+        scenes.push({
+          ...scene,
+          broll_path: result.path,
+          pexels_credit: result.credit,
+          pexels_url: result.url,
+        });
+      } catch (e) {
+        emit({
+          type: "log",
+          step: "fetch_broll",
+          message: `Pexels video failed for ${scene.id}: ${e instanceof Error ? e.message : String(e)}. Fallback to big_callout.`,
+        });
+        scenes.push({ ...scene, layout: "big_callout" as const });
+      }
+      continue;
+    }
+
+    if (PHOTO_LAYOUTS.has(layout) && !hasUserShot && query && pexelsKey) {
+      const outPath = path.join(pexelsDir, `${scene.id}.jpg`);
+      try {
+        emit({ type: "log", step: "fetch_broll", message: `Fetching Pexels photo for ${scene.id}: "${query}"` });
+        const result = await fetchPexelsPhoto(query, pexelsKey, outPath, orientation);
+        scenes.push({
+          ...scene,
+          screenshot_path: result.path,
+          image_fit: scene.image_fit ?? ("cover" as const),
+          pexels_credit: result.credit,
+          pexels_url: result.url,
+          layout: layout === "stat" ? layout : layout === "split" ? layout : "screenshot",
+        });
+      } catch (e) {
+        emit({
+          type: "log",
+          step: "fetch_broll",
+          message: `Pexels photo failed for ${scene.id}: ${e instanceof Error ? e.message : String(e)}`,
+        });
+        scenes.push(scene);
+      }
+      continue;
+    }
+
+    scenes.push(scene);
+  }
+
+  return { ...plan, scenes };
+}
+
+async function resolveUserAssetsFolder(plan: VideoPlan, projectDir: string): Promise<VideoPlan> {
+  const userAssets = path.join(projectDir, "user_assets");
+  try {
+    await fs.access(userAssets);
+  } catch {
+    return plan;
+  }
+
+  const entries = await fs.readdir(userAssets);
+  const byStem = new Map<string, string>();
+  for (const name of entries) {
+    const stem = path.parse(name).name;
+    byStem.set(stem, path.join(userAssets, name));
+  }
+
+  const imageExt = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif"]);
+  const videoExt = new Set([".mp4", ".webm", ".mov", ".mkv"]);
+
+  const scenes = plan.scenes.map((scene) => {
+    const file = byStem.get(scene.id);
+    if (!file) return scene;
+    const ext = path.extname(file).toLowerCase();
+    if (videoExt.has(ext)) {
+      return {
+        ...scene,
+        broll_path: file,
+        layout: "broll" as const,
+      };
+    }
+    if (imageExt.has(ext)) {
+      return {
+        ...scene,
+        screenshot_path: file,
+        image_fit: scene.image_fit ?? ("cover" as const),
+        layout:
+          scene.layout === "broll" || scene.layout === "stat" || scene.layout === "bar_chart" || scene.layout === "big_callout"
+            ? scene.layout === "broll"
+              ? ("screenshot" as const)
+              : scene.layout
+            : scene.layout ?? ("screenshot" as const),
+      };
+    }
+    return scene;
+  });
+
+  return { ...plan, scenes };
+}
+
+async function findExistingVoiceover(projectDir: string): Promise<string | null> {
+  const ttsDir = path.join(projectDir, "tts");
+  const candidates = ["voiceover.wav", "voiceover.raw.wav"];
+  for (const name of candidates) {
+    const p = path.join(ttsDir, name);
+    try {
+      await fs.access(p);
+      return p;
+    } catch {
+      /* continue */
+    }
+  }
+  try {
+    const entries = await fs.readdir(ttsDir);
+    const wav = entries.find((e) => /^voiceover.*\.wav$/i.test(e));
+    if (wav) return path.join(ttsDir, wav);
+  } catch {
+    /* none */
+  }
+  return null;
 }
 
 async function extractArticle(url: string, projectDir: string) {
@@ -331,7 +627,7 @@ async function extractArticle(url: string, projectDir: string) {
   const page = await context.newPage();
 
   // Nhiều site chặn headless browser (403). Ưu tiên fetch HTML trực tiếp, rồi setContent để chụp screenshot.
-  const fetched = await fetchHtml();
+  const fetched = await withRetry("Article HTML fetch", fetchHtml, 2);
   await page.setContent(fetched.html, { waitUntil: "domcontentloaded", timeout: 120_000 });
   await page.waitForSelector("h1", { timeout: 60_000, state: "attached" }).catch(() => {});
   await page.waitForSelector("p", { timeout: 60_000, state: "attached" }).catch(() => {});
@@ -424,8 +720,6 @@ function pickScreenshotParagraphs(paragraphs: { id: string; index: number; root:
     .map((p, idx) => {
       const score =
         (hasNumber(p.text) ? 3 : 0) +
-        (p.text.includes("OpenAI") ? 1 : 0) +
-        (p.text.includes("GPT") ? 1 : 0) +
         (p.text.length >= 140 ? 1 : 0) +
         (idx > paragraphs.length * 0.6 ? 0.5 : 0);
       return { p, score };
@@ -510,9 +804,9 @@ async function captureScreenshots(
 }
 
 function getLayoutCycle(mode: LayoutMode): SceneLayout[] {
-  if (mode === "mono") return ["screenshot"];
-  if (mode === "dual") return ["screenshot", "big_callout"];
-  return ["screenshot", "big_callout", "split"];
+  if (mode === "mono") return ["screenshot", "stat", "big_callout"];
+  if (mode === "dual") return ["screenshot", "big_callout", "stat", "bar_chart"];
+  return ["screenshot", "big_callout", "bar_chart", "broll"];
 }
 
 function fallbackCallouts(lines: string[]) {
@@ -524,7 +818,35 @@ function fallbackCallouts(lines: string[]) {
 function normalizePlan(plan: VideoPlan, prefs: RenderPrefs) {
   const cycle = getLayoutCycle(prefs.layoutMode);
   const normalizedScenes = plan.scenes.map((scene, index) => {
-    const layout = scene.layout ?? cycle[index % cycle.length];
+    let layout: SceneLayout = (scene.layout as SceneLayout | undefined) ?? cycle[index % cycle.length];
+    let stat = scene.stat;
+    let chart = scene.chart;
+    let image_fit = scene.image_fit;
+
+    if (layout === "stat" && !stat?.value) {
+      const raw = scene.callouts?.[0]?.trim() || scene.caption_lines[0]?.trim();
+      if (raw) {
+        stat = {
+          value: raw.slice(0, 18),
+          label: (scene.caption_lines[1] || scene.caption_lines[0] || "Key point").slice(0, 80),
+        };
+      } else {
+        layout = "big_callout";
+      }
+    } else if (layout === "bar_chart" && (!chart?.bars || chart.bars.length === 0)) {
+      if (stat?.value) {
+        layout = "stat";
+      } else {
+        layout = "big_callout";
+        chart = undefined;
+      }
+    }
+
+    if (layout === "screenshot" && !image_fit) {
+      const p = (scene.screenshot_path || scene.screenshot_file || "").toLowerCase();
+      image_fit = p.includes("openrouter") || p.includes("proof") || p.includes("contain") ? "contain" : "cover";
+    }
+
     const callouts = prefs.enableCallouts
       ? (scene.callouts?.filter((x) => x.trim().length > 0).slice(0, 2) ?? fallbackCallouts(scene.caption_lines))
       : [];
@@ -532,9 +854,78 @@ function normalizePlan(plan: VideoPlan, prefs: RenderPrefs) {
       ...scene,
       layout,
       callouts,
+      stat,
+      chart,
+      image_fit,
     };
   });
   return { ...plan, scenes: normalizedScenes };
+}
+
+async function resolvePlanAssets(plan: VideoPlan, assetsDir: string | undefined, projectDir: string): Promise<VideoPlan> {
+  let next = await resolveUserAssetsFolder(plan, projectDir);
+  if (!assetsDir) return next;
+  const absAssets = path.isAbsolute(assetsDir) ? assetsDir : path.join(process.cwd(), assetsDir);
+  const shotsDir = path.join(projectDir, "screenshots");
+  await ensureDir(shotsDir);
+
+  const tryResolve = async (name: string): Promise<string | null> => {
+    for (const ext of [".png", ".jpg", ".jpeg", ".webp"]) {
+      const candidate = path.join(absAssets, `${name}${ext}`);
+      try {
+        await fs.access(candidate);
+        return candidate;
+      } catch {
+        /* continue */
+      }
+    }
+    const direct = path.join(absAssets, name);
+    try {
+      await fs.access(direct);
+      return direct;
+    } catch {
+      return null;
+    }
+  };
+
+  const scenes = await Promise.all(
+    next.scenes.map(async (scene) => {
+      let screenshot_path = scene.screenshot_path;
+      const fileKey = scene.screenshot_file || scene.id;
+      const found = await tryResolve(fileKey);
+      if (found) {
+        const dest = path.join(shotsDir, `${scene.id}${path.extname(found) || ".png"}`);
+        await fs.copyFile(found, dest);
+        screenshot_path = dest;
+      } else if (screenshot_path && !path.isAbsolute(screenshot_path)) {
+        const fromAssets = path.join(absAssets, screenshot_path);
+        try {
+          await fs.access(fromAssets);
+          const dest = path.join(shotsDir, `${scene.id}${path.extname(fromAssets) || ".png"}`);
+          await fs.copyFile(fromAssets, dest);
+          screenshot_path = dest;
+        } catch {
+          /* keep as-is */
+        }
+      }
+
+      if (!screenshot_path) return scene;
+      const lower = screenshot_path.toLowerCase();
+      const image_fit =
+        scene.image_fit ??
+        (lower.includes("openrouter") || lower.includes("proof") ? "contain" : "cover");
+      return {
+        ...scene,
+        screenshot_path,
+        layout: scene.layout === "broll" || scene.layout === "stat" || scene.layout === "bar_chart" || scene.layout === "big_callout"
+          ? scene.layout
+          : "screenshot",
+        image_fit,
+      };
+    }),
+  );
+
+  return { ...next, scenes };
 }
 
 function buildPlanPrompt(articleText: string, title: string, prefs: RenderPrefs) {
@@ -559,13 +950,13 @@ function buildPlanPrompt(articleText: string, title: string, prefs: RenderPrefs)
     : "- Để callouts là mảng rỗng [].";
   const layoutRule =
     prefs.layoutMode === "tri"
-      ? "- layout luân phiên các kiểu: screenshot, big_callout, split, broll; không lặp quá 2 scene liên tiếp. Chọn broll cho các scene phù hợp với video minh họa nền (B-roll)."
+      ? "- layout dùng tin tức visual: screenshot, big_callout, stat, bar_chart, broll, split. Không lặp quá 2 scene cùng layout. hook/impact ưu tiên stat|big_callout; evidence ưu tiên screenshot|bar_chart."
       : prefs.layoutMode === "dual"
-        ? "- layout dùng screenshot, big_callout và broll luân phiên để tránh đều đều."
-        : "- layout dùng screenshot hoặc broll cho tất cả scene.";
+        ? "- layout dùng screenshot, big_callout, stat, bar_chart luân phiên."
+        : "- layout dùng screenshot, stat hoặc big_callout; broll khi cần minh họa.";
 
-  return `Bạn là biên tập viên video TikTok tiếng Việt dạng explainer về an ninh mạng.
-Mục tiêu: giữ retention cao, dễ hiểu, không bịa, chỉ dựa vào nội dung đầu vào.
+  return `Bạn là biên tập viên video short-form tiếng Việt (TikTok/Reels/Shorts) dạng explainer tin tức.
+Mục tiêu: kể lại rõ ràng chủ đề bất kỳ (kinh tế, xã hội, khoa học, thể thao, giải trí, chính trị, công nghệ…), giữ retention cao, dễ hiểu, không bịa — chỉ dựa vào nội dung đầu vào.
 
 Trả về JSON theo schema:
 {
@@ -576,15 +967,24 @@ Trả về JSON theo schema:
     {
       "id": "s1",
       "role": "hook|re_hook|why_matters|what_happened|evidence|context|impact|takeaway",
-      "duration_sec": number (3-14),
+      "duration_sec": number (integer 3-12, KHÔNG dùng số thập phân),
       "caption_lines": [string, string?],
       "voiceover": "string (ví dụ: [excitedly] Chào các bạn!)",
-      "layout": "screenshot|big_callout|split|broll",
+      "layout": "screenshot|big_callout|split|broll|stat|bar_chart",
       "callouts": [string, string?],
-      "pexels_query": "string (1-3 từ khóa tiếng Anh cực kỳ ngắn gọn và chính xác để tìm video B-roll minh họa, ví dụ: 'hacker', 'server room', 'frustrated man'. BẮT BUỘC phải có nếu layout là 'broll')"
+      "stat": { "value": "10/10", "label": "công ty dùng AI", "delta": "optional" },
+      "chart": { "title": "optional", "bars": [{ "label": "Hiểu rủi ro", "value": 80 }, { "label": "Sợ mù quáng", "value": 25 }] },
+      "pexels_query": "string (1-3 từ khóa tiếng Anh; BẮT BUỘC cho mọi layout trừ big_callout — dùng tìm ảnh/video Pexels khi thiếu asset)"
     }
   ]
 }
+
+Quy tắc visual theo role:
+- hook / impact / takeaway: ưu tiên layout "stat" hoặc "big_callout" (kèm object stat nếu dùng stat).
+- evidence: ưu tiên "screenshot" hoặc "bar_chart" (kèm chart.bars lấy số từ bài, KHÔNG bịa).
+- what_happened / context: "screenshot" hoặc "broll".
+- Khi layout="stat" → BẮT BUỘC có "stat". Khi layout="bar_chart" → BẮT BUỘC có "chart.bars" (1-5 mục).
+- Mọi scene không phải big_callout phải có pexels_query (ảnh stock / B-roll khi thiếu screenshot).
 
 Yêu cầu cực kỳ quan trọng cho \`audio_prompt\`:
 - BẠN BẮT BUỘC phải tạo ra một \`audio_prompt\` dạng Markdown có cấu trúc chính xác như sau:
@@ -650,6 +1050,7 @@ async function planVideoWithGemini(articleText: string, title: string, geminiKey
         scenes: plan.scenes.length,
         target: plan.target_duration_sec,
         attempt,
+        plan,
       });
       return plan;
     } catch (error) {
@@ -667,8 +1068,8 @@ function buildPromptPlanPrompt(userPrompt: string, prefs: RenderPrefs) {
     ? "- Mỗi scene phải có callouts 1-2 item ngắn (6-28 ký tự), và callouts phải xuất hiện trong voiceover."
     : "- Để callouts là mảng rỗng [].";
 
-  return `Bạn là biên tập viên video TikTok tiếng Việt.
-Mục tiêu: Tạo kịch bản video dựa trên yêu cầu của người dùng, giữ retention cao, ngôn ngữ tự nhiên.
+  return `Bạn là biên tập viên video short-form tiếng Việt (TikTok/Reels/Shorts).
+Mục tiêu: Tạo kịch bản video dựa trên yêu cầu của người dùng cho bất kỳ chủ đề tin tức/explainer nào, giữ retention cao, ngôn ngữ tự nhiên, không bịa.
 
 Trả về JSON theo schema:
 {
@@ -682,9 +1083,11 @@ Trả về JSON theo schema:
       "duration_sec": number (5-12),
       "caption_lines": [string, string?],
       "voiceover": "string (ví dụ: [excitedly] Chào các bạn!)",
-      "layout": "big_callout|split|broll",
+      "layout": "big_callout|split|broll|stat|bar_chart|screenshot",
       "callouts": [string, string?],
-      "pexels_query": "string (1-3 từ khóa tiếng Anh cực kỳ ngắn gọn và chính xác để tìm video B-roll minh họa, ví dụ: 'hacker', 'sad person'. BẮT BUỘC phải có nếu layout là 'broll')"
+      "stat": { "value": "string", "label": "string" },
+      "chart": { "title": "string?", "bars": [{ "label": "string", "value": number }] },
+      "pexels_query": "string (1-3 từ khóa tiếng Anh; BẮT BUỘC cho mọi layout trừ big_callout, ví dụ: 'city street', 'office', 'stock chart')"
     }
   ]
 }
@@ -717,7 +1120,7 @@ Ràng buộc chung:
 - caption_lines là tóm tắt trực tiếp của voiceover.
 - voiceover mở đầu bằng câu diễn giải lại caption_lines.
 ${calloutRule}
-- Layout MẶC ĐỊNH bắt buộc là "big_callout", "split" hoặc "broll". ĐỪNG trả về "screenshot". Hãy dùng "broll" cho khoảng 50% số lượng cảnh (kèm pexels_query) để video thêm sinh động.
+- Layout MẶC ĐỊNH bắt buộc là "big_callout", "split", "stat", "bar_chart" hoặc "broll". ĐỪNG trả về "screenshot". Dùng "broll" cho ~30–50% cảnh. Mọi scene không phải big_callout phải có pexels_query.
 - Giọng văn: Kể chuyện hấp dẫn, cuốn hút, dứt khoát.
 
 Yêu cầu/Ý tưởng của người dùng:
@@ -747,6 +1150,7 @@ async function planVideoFromPromptWithGemini(userPrompt: string, geminiKey: stri
         scenes: plan.scenes.length,
         target: plan.target_duration_sec,
         attempt,
+        plan,
       });
       return plan;
     } catch (error) {
@@ -793,26 +1197,35 @@ async function planVideoWithOpenAI(
   const data = (await res.json()) as any;
   const parsed = parsePlanFromModelOutput(String(data?.choices?.[0]?.message?.content ?? ""));
   const plan = normalizePlan(parsed, prefs);
-  emit({ type: "step_done", step: "plan", scenes: plan.scenes.length, target: plan.target_duration_sec });
+  emit({ type: "step_done", step: "plan", scenes: plan.scenes.length, target: plan.target_duration_sec, plan });
   return plan;
 }
 
-async function geminiTtsToWav(text: string, outFile: string, geminiKey: string, voiceName: string = "Zephyr", audioModel: string = "gemini-3.1-flash-tts-preview") {
+async function geminiTtsToWav(
+  text: string,
+  outFile: string,
+  geminiKey: string,
+  voiceName: string = "Zephyr",
+  audioModel: string = "gemini-3.1-flash-tts-preview",
+) {
   emit({ type: "step_start", step: "tts" });
   const ai = new GoogleGenAI({ apiKey: geminiKey });
+  const model = audioModel || "gemini-3.1-flash-tts-preview";
 
-  const response = await ai.models.generateContent({
-    model: "gemini-3.1-flash-tts-preview",
-    contents: [{ parts: [{ text }] }],
-    config: {
-      responseModalities: ["AUDIO"],
-      speechConfig: {
-        voiceConfig: {
-          prebuiltVoiceConfig: { voiceName },
+  const response = await withRetry("Gemini TTS", () =>
+    ai.models.generateContent({
+      model,
+      contents: [{ parts: [{ text }] }],
+      config: {
+        responseModalities: ["AUDIO"],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName },
+          },
         },
       },
-    },
-  });
+    }),
+  );
 
   const dataB64 = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
   if (!dataB64) throw new Error("Không nhận được audio từ Gemini TTS.");
@@ -865,13 +1278,18 @@ async function openaiTtsToWav(text: string, outFile: string, openaiKey: string) 
 }
 
 async function macosSayTtsToWav(text: string, outFile: string) {
+  if (process.platform !== "darwin") {
+    throw new Error(
+      'TTS provider "macos" chỉ hỗ trợ trên macOS. Dùng Gemini (--tts gemini) hoặc OpenAI (--tts openai) trên Windows.',
+    );
+  }
   emit({ type: "step_start", step: "tts" });
 
   const tmpAiff = outFile.replace(/\.wav$/i, ".aiff");
   await ensureDir(path.dirname(outFile));
 
   const { execFile } = await import("node:child_process");
-  const execFileP = (file: string, args: string[]) =>
+  const execFilePLocal = (file: string, args: string[]) =>
     new Promise<void>((resolve, reject) => {
       execFile(file, args, { maxBuffer: 10 * 1024 * 1024 }, (err) => {
         if (err) return reject(err);
@@ -879,11 +1297,11 @@ async function macosSayTtsToWav(text: string, outFile: string) {
       });
     });
 
-  // macOS built-in TTS (Vietnamese voice: Linh)
-  await execFileP("say", ["-v", "Linh", "-o", tmpAiff, text]);
+  // macOS built-in TTS (Vietnamese voice: Linh when available)
+  await execFilePLocal("say", ["-v", "Linh", "-o", tmpAiff, text]);
 
   // Convert to mono 24k wav for consistent muxing
-  await execFileP("ffmpeg", ["-y", "-i", tmpAiff, "-ar", "24000", "-ac", "1", outFile]);
+  await execFilePLocal("ffmpeg", ["-y", "-i", tmpAiff, "-ar", "24000", "-ac", "1", outFile]);
 
   emit({ type: "step_done", step: "tts", wav: outFile });
 }
@@ -1047,16 +1465,35 @@ async function renderRemotionVideo(
   };
   const scenesWithShots = await Promise.all(
     plan.scenes.map(async (s) => {
-      const shotPath = roleToShot[s.role as SceneRole] ?? screenshotMeta.headline?.path;
-      const screenshot_src = shotPath ? await fileToDataUrl(shotPath, "image/png") : undefined;
+      const shotPath =
+        s.screenshot_path ||
+        roleToShot[s.role as SceneRole] ||
+        screenshotMeta.headline?.path;
+      const screenshot_src = shotPath
+        ? await fileToDataUrl(
+            shotPath,
+            shotPath.toLowerCase().endsWith(".jpg") || shotPath.toLowerCase().endsWith(".jpeg")
+              ? "image/jpeg"
+              : "image/png",
+          )
+        : undefined;
       const broll_src = s.broll_path ? await fileToDataUrl(s.broll_path, "video/mp4") : undefined;
+      const image_fit =
+        s.image_fit ??
+        (shotPath &&
+        (shotPath.toLowerCase().includes("openrouter") || shotPath.toLowerCase().includes("proof"))
+          ? "contain"
+          : "cover");
       return {
         ...s,
         screenshot_path: shotPath,
         screenshot_src,
         broll_src,
-        layout: s.layout ?? "screenshot",
+        image_fit,
+        layout: s.layout ?? (shotPath ? "screenshot" : "big_callout"),
         callouts: s.callouts ?? [],
+        stat: s.stat,
+        chart: s.chart,
       };
     }),
   );
@@ -1158,10 +1595,15 @@ async function qc(projectDir: string, mp4Path: string) {
 
   await execFileP("ffmpeg", ["-y", "-i", mp4Path, "-frames:v", "1", path.join(qcDir, "thumb.png")]);
 
-  const notes = `# Review notes (manual)\n\n- Hook 0–4s: \n- Nhịp scene: \n- Caption (Montserrat, không tràn): \n- TTS tiếng Việt (tự nhiên/đọc sai): \n- Có bịa chi tiết không: \n`;
+  const duration = Number(ffprobeJson?.format?.duration ?? 0);
+  if (!Number.isFinite(duration) || duration <= 0.25) {
+    throw new Error(`QC failed: video duration invalid (${duration}).`);
+  }
+
+  const notes = `# Review notes (manual)\n\n- Hook 0–4s:\n- Scene pacing:\n- Captions (readable, no overflow):\n- TTS naturalness:\n- Factual accuracy vs source:\n- Auto duration: ${duration.toFixed(2)}s\n`;
   await fs.writeFile(path.join(qcDir, "review_notes.md"), notes, "utf-8");
 
-  emit({ type: "step_done", step: "qc", qcDir });
+  emit({ type: "step_done", step: "qc", qcDir, durationSec: duration });
   return qcDir;
 }
 
@@ -1183,38 +1625,274 @@ function assignScreenshotsToScenes(
   return { ...plan, scenes };
 }
 
+async function loadPlanFromDisk(planPath: string, prefs: RenderPrefs): Promise<VideoPlan> {
+  const raw = JSON.parse(await fs.readFile(planPath, "utf-8"));
+  return normalizePlan(VideoPlanSchema.parse(raw) as VideoPlan, prefs);
+}
+
+async function writePlanAndMeta(projectDir: string, plan: VideoPlan) {
+  await ensureDir(path.join(projectDir, "plan"));
+  await writeJson(path.join(projectDir, "plan", "video_plan.json"), plan);
+}
+
+async function prepareVoiceover(
+  plan: VideoPlan,
+  args: z.infer<typeof ArgsSchema>,
+  prefs: RenderPrefs,
+  baseOut: string,
+): Promise<{ plan: VideoPlan; fittedAudioPath: string }> {
+  const audioPathRaw = path.join(baseOut, "tts", "voiceover.raw.wav");
+  const audioPath = path.join(baseOut, "tts", "voiceover.wav");
+
+  const existing = await findExistingVoiceover(baseOut);
+  if (existing && !args.audioPath) {
+    emit({ type: "log", step: "tts", message: `Reuse existing voiceover: ${existing}` });
+    return { plan, fittedAudioPath: existing };
+  }
+
+  if (args.audioPath) {
+    emit({ type: "log", step: "tts", message: "Chế độ Audio: Bỏ qua TTS, dùng file upload." });
+    await ensureDir(path.join(baseOut, "tts"));
+    await execFileP("ffmpeg", ["-y", "-i", args.audioPath, audioPathRaw]);
+    return { plan, fittedAudioPath: audioPathRaw };
+  }
+
+  if (existing) {
+    emit({ type: "log", step: "tts", message: `Reuse existing voiceover: ${existing}` });
+    return { plan, fittedAudioPath: existing };
+  }
+
+  const ttsProvider =
+    args.tts ??
+    (args.geminiKey
+      ? "gemini"
+      : args.openaiKey
+        ? "openai"
+        : process.platform === "darwin"
+          ? "macos"
+          : null);
+
+  if (!ttsProvider) {
+    throw new Error(
+      "Không có TTS provider. Cần GEMINI_API_KEY hoặc OPENAI_API_KEY (Windows không hỗ trợ macos say).",
+    );
+  }
+
+  let nextPlan = plan;
+  let fittedAudioPath = audioPathRaw;
+
+  for (let retry = 0; retry < 3; retry++) {
+    const voiceover = nextPlan.scenes.map((s) => s.voiceover.trim()).join("\n");
+    const ttsInput = nextPlan.audio_prompt ? nextPlan.audio_prompt : voiceover;
+
+    if (ttsProvider === "gemini") {
+      if (!args.geminiKey) throw new Error("tts=gemini nhưng thiếu GEMINI_API_KEY.");
+      await geminiTtsToWav(
+        ttsInput,
+        audioPathRaw,
+        args.geminiKey,
+        args.voice,
+        prefs.audioModel || "gemini-3.1-flash-tts-preview",
+      );
+    } else if (ttsProvider === "openai") {
+      if (!args.openaiKey) throw new Error("tts=openai nhưng thiếu OPENAI_API_KEY.");
+      await openaiTtsToWav(voiceover, audioPathRaw, args.openaiKey);
+    } else {
+      await macosSayTtsToWav(voiceover, audioPathRaw);
+    }
+
+    const planTotalSec = nextPlan.scenes.reduce((s, sc) => s + (sc.duration_sec ?? 0), 0);
+    const fit = await fitAudioToTargetDuration(audioPathRaw, audioPath, planTotalSec, 1.5);
+    fittedAudioPath = fit.path;
+
+    if (!fit.requiresRewrite) break;
+    if (!args.geminiKey) {
+      emit({
+        type: "log",
+        step: "audio_fit",
+        message: `Không có GEMINI_API_KEY để rewrite script, buộc speed-up cao (x${fit.factor.toFixed(2)}).`,
+      });
+      const forcedFit = await fitAudioToTargetDuration(audioPathRaw, audioPath, planTotalSec, 3);
+      fittedAudioPath = forcedFit.path;
+      break;
+    }
+    if (retry >= 2) {
+      throw new Error(
+        `Đã thử rút gọn voiceover nhiều lần nhưng vẫn quá dài (x${fit.factor.toFixed(2)}).`,
+      );
+    }
+    nextPlan = await rewritePlanVoiceoverWithGemini(nextPlan, planTotalSec, args.geminiKey, prefs);
+    emit({
+      type: "log",
+      step: "plan_rewrite",
+      message: `Đã rút gọn voiceover lần ${retry + 1} để giữ tốc đọc <= 1.5x`,
+    });
+  }
+
+  return { plan: nextPlan, fittedAudioPath };
+}
+
+async function runRenderStage(
+  plan: VideoPlan,
+  args: z.infer<typeof ArgsSchema>,
+  prefs: RenderPrefs,
+  baseOut: string,
+  screenshotsMeta: Record<string, { path: string }>,
+) {
+  const orientation = args.platform === "youtube" ? "landscape" : "portrait";
+
+  emit({ type: "step_start", step: "fetch_broll" });
+  let next = await resolvePlanAssets(plan, args.assetsDir, baseOut);
+  next = await autoFillPexelsAssets(next, args.pexelsKey, baseOut, orientation);
+  next = {
+    ...next,
+    scenes: next.scenes.map((s) =>
+      s.layout === "screenshot" && s.screenshot_path && !s.image_fit
+        ? { ...s, image_fit: "cover" as const }
+        : s,
+    ),
+  };
+  emit({ type: "step_done", step: "fetch_broll" });
+
+  const voice = await prepareVoiceover(next, args, prefs, baseOut);
+  next = voice.plan;
+  await writePlanAndMeta(baseOut, next);
+
+  const mp4 = await renderRemotionVideo(baseOut, next, voice.fittedAudioPath, screenshotsMeta, prefs);
+  try {
+    await fs.access(mp4);
+  } catch {
+    throw new Error(`QC failed: missing output file ${mp4}`);
+  }
+  await qc(baseOut, mp4);
+  emit({ type: "done", projectDir: baseOut, mp4 });
+}
+
 async function main() {
   const args = parseArgs(process.argv);
   const prefs = toRenderPrefs(args);
-  if (!args.planFile && !args.geminiKey && !args.openaiKey) {
+  const stage = args.stage ?? "full";
+
+  if (stage === "render") {
+    if (!args.projectDir && !args.planFile) {
+      throw new Error("stage=render cần --projectDir hoặc --planFile.");
+    }
+  } else if (!args.planFile && !args.geminiKey && !args.openaiKey) {
     throw new Error(
       "Thiếu cấu hình. Hãy truyền --planFile, hoặc truyền --geminiKey/--openaiKey (hoặc set env GEMINI_API_KEY / OPENAI_API_KEY).",
     );
   }
+
+  await preflightTools();
 
   const now = new Date();
   const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
     now.getDate(),
   ).padStart(2, "0")}__${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
 
-  const slug = args.url ? slugify(args.url) : "prompt-" + stamp;
-  const baseOut = args.outDir ?? path.join(process.cwd(), "output", `${stamp}__${slug}`);
-  await ensureDir(baseOut);
-
+  let browser: import("playwright").Browser | undefined;
   try {
-    emit({ type: "step_start", step: "config", prefs });
-    
-    let browser, page, articleJson, screenshotsMeta: Record<string, { path: string }> = {};
+    emit({ type: "step_start", step: "config", prefs, stage });
+
+    // ── stage=render: load existing project ──────────────────────────────────
+    if (stage === "render") {
+      const baseOut = args.projectDir
+        ? path.isAbsolute(args.projectDir)
+          ? args.projectDir
+          : path.join(process.cwd(), args.projectDir)
+        : path.dirname(path.dirname(args.planFile!));
+      await ensureDir(baseOut);
+
+      const planPath =
+        args.planFile ??
+        path.join(baseOut, "plan", "video_plan.json");
+      let plan = await loadPlanFromDisk(planPath, prefs);
+      emit({
+        type: "step_done",
+        step: "plan",
+        scenes: plan.scenes.length,
+        target: plan.target_duration_sec,
+        source: "planFile",
+        plan,
+      });
+
+      // Prefer prefs saved alongside project if present
+      try {
+        const prefsPath = path.join(baseOut, "plan", "render_prefs.json");
+        const saved = JSON.parse(await fs.readFile(prefsPath, "utf-8")) as Partial<RenderPrefs>;
+        Object.assign(prefs, saved);
+      } catch {
+        /* optional */
+      }
+
+      await runRenderStage(plan, args, prefs, baseOut, {});
+      return;
+    }
+
+    // ── stage=plan | full: create project + plan ─────────────────────────────
+    const slug = args.url ? slugify(args.url) : "prompt-" + stamp;
+    const baseOut = args.outDir ?? path.join(process.cwd(), "output", `${stamp}__${slug}`);
+    await ensureDir(baseOut);
+
+    let screenshotsMeta: Record<string, { path: string }> = {};
     let plan: VideoPlan;
 
-    if (args.platform === "youtube" && args.audioPath && args.script) {
-      emit({ type: "log", step: "config", message: "Chế độ YouTube: Bỏ qua extract/screenshot." });
+    if (args.audioPath && args.script) {
+      const isLandscape = args.platform === "youtube";
+      emit({
+        type: "log",
+        step: "config",
+        message: isLandscape
+          ? "Chế độ audio+script (YouTube landscape): bỏ qua extract/screenshot."
+          : "Chế độ audio+script (TikTok 9:16): bỏ qua extract/screenshot.",
+      });
+      if (!isLandscape) {
+        prefs.template = args.template && args.template !== "YouTubeStoryV1" ? args.template : "NewsStoryV1";
+      } else {
+        prefs.template = args.template && args.template !== "NewsStoryV1" ? args.template : "YouTubeStoryV1";
+      }
       const duration = await getAudioDurationSec(args.audioPath);
-      plan = await planVideoFromScriptWithGemini(args.script, duration, args.geminiKey!, prefs);
+      if (args.planFile) {
+        plan = await loadPlanFromDisk(args.planFile, prefs);
+        plan.target_duration_sec = Math.round(duration);
+        const total = plan.scenes.reduce((sum, s) => sum + (s.duration_sec ?? 0), 0);
+        if (total > 0 && Math.abs(total - duration) > 2) {
+          const factor = duration / total;
+          for (const s of plan.scenes) {
+            s.duration_sec = Math.max(3, Math.min(12, Math.round((s.duration_sec ?? 0) * factor)));
+          }
+        }
+        emit({
+          type: "step_done",
+          step: "plan",
+          scenes: plan.scenes.length,
+          target: plan.target_duration_sec,
+          source: "planFile",
+          plan,
+        });
+      } else if (args.geminiKey) {
+        plan = await planVideoFromScriptWithGemini(args.script, duration, args.geminiKey, prefs);
+      } else {
+        throw new Error(
+          "Audio+script mode cần --geminiKey (hoặc GEMINI_API_KEY) để lập plan, hoặc truyền --planFile có sẵn.",
+        );
+      }
+      // Stage plan: copy audio early so render can reuse
+      await ensureDir(path.join(baseOut, "tts"));
+      const audioPathRaw = path.join(baseOut, "tts", "voiceover.raw.wav");
+      await execFileP("ffmpeg", ["-y", "-i", args.audioPath, audioPathRaw]);
     } else if (args.prompt) {
       emit({ type: "log", step: "config", message: "Chế độ Prompt: Bỏ qua extract/screenshot." });
       if (args.planFile) {
-        plan = normalizePlan(VideoPlanSchema.parse(JSON.parse(await fs.readFile(args.planFile, "utf-8"))) as VideoPlan, prefs);
+        plan = await loadPlanFromDisk(args.planFile, prefs);
+        emit({
+          type: "step_done",
+          step: "plan",
+          scenes: plan.scenes.length,
+          target: plan.target_duration_sec,
+          source: "planFile",
+          plan,
+        });
       } else if (args.geminiKey) {
         plan = await planVideoFromPromptWithGemini(args.prompt, args.geminiKey, prefs);
       } else {
@@ -1223,135 +1901,52 @@ async function main() {
     } else if (args.url) {
       const res = await extractArticle(args.url, baseOut);
       browser = res.browser;
-      page = res.page;
-      articleJson = res.articleJson;
-      
-      screenshotsMeta = await captureScreenshots(page, baseOut, articleJson.paragraphs);
+      const articleJson = res.articleJson;
+
+      screenshotsMeta = await captureScreenshots(res.page, baseOut, articleJson.paragraphs);
       const sourceText = articleJson.text || articleJson.paragraphs.map((p: { text: string }) => p.text).join("\n");
 
       if (args.planFile) {
-        plan = normalizePlan(VideoPlanSchema.parse(JSON.parse(await fs.readFile(args.planFile, "utf-8"))) as VideoPlan, prefs);
+        plan = await loadPlanFromDisk(args.planFile, prefs);
+        emit({
+          type: "step_done",
+          step: "plan",
+          scenes: plan.scenes.length,
+          target: plan.target_duration_sec,
+          source: "planFile",
+          plan,
+        });
       } else if (args.geminiKey) {
         plan = await planVideoWithGemini(sourceText, articleJson.title, args.geminiKey, prefs);
       } else {
         plan = await planVideoWithOpenAI(sourceText, articleJson.title, args.openaiKey!, prefs);
       }
 
-      // Assign screenshot paths to scenes with layout="screenshot"
       plan = assignScreenshotsToScenes(plan, screenshotsMeta);
       const assignedCount = plan.scenes.filter((s) => s.layout === "screenshot" && s.screenshot_path).length;
       emit({ type: "step_done", step: "assign_screenshots", assigned: assignedCount });
     } else {
-      throw new Error("Phải cung cấp --url hoặc --prompt.");
+      throw new Error("Phải cung cấp --url, --prompt, hoặc --audioPath + --script.");
     }
 
-    // Fetch B-roll videos if any scenes use layout: "broll" and we have pexelsKey
-    const brollScenes = plan.scenes.filter((s) => s.layout === "broll" && s.pexels_query);
-    if (brollScenes.length > 0) {
-      if (args.pexelsKey) {
-        emit({ type: "step_start", step: "fetch_broll", count: brollScenes.length });
-        const brollsDir = path.join(baseOut, "brolls");
-        await ensureDir(brollsDir);
+    await writePlanAndMeta(baseOut, plan);
+    await writeJson(path.join(baseOut, "plan", "render_prefs.json"), prefs);
+    emit({ type: "plan_ready", projectDir: baseOut, plan, stage });
 
-        for (const scene of brollScenes) {
-          const query = scene.pexels_query!;
-          const outPath = path.join(brollsDir, `scene_${scene.id}.mp4`);
-          emit({ type: "log", step: "fetch_broll", message: `Fetching Pexels B-roll for scene ${scene.id} with query: "${query}"` });
-          try {
-            const orientation = args.platform === "youtube" ? "landscape" : "portrait";
-            await fetchPexelsVideo(query, args.pexelsKey, outPath, orientation);
-            scene.broll_path = outPath;
-            emit({ type: "log", step: "fetch_broll", message: `Successfully downloaded B-roll for scene ${scene.id}: ${outPath}` });
-          } catch (e) {
-            emit({
-              type: "log",
-              step: "fetch_broll",
-              message: `Failed to download B-roll for scene ${scene.id}: ${e instanceof Error ? e.message : String(e)}. Fallback to big_callout.`,
-            });
-            scene.layout = "big_callout";
-          }
-        }
-        emit({ type: "step_done", step: "fetch_broll" });
-      } else {
-        emit({
-          type: "log",
-          step: "fetch_broll",
-          message: "Warning: Pexels API key not provided, falling back all broll scenes to big_callout layout.",
-        });
-        for (const scene of brollScenes) {
-          scene.layout = "big_callout";
-        }
-      }
+    if (stage === "plan") {
+      emit({ type: "done", projectDir: baseOut, planReady: true });
+      return;
     }
 
-    const audioPathRaw = path.join(baseOut, "tts", "voiceover.raw.wav");
-    const audioPath = path.join(baseOut, "tts", "voiceover.wav");
-    let fittedAudioPath = audioPathRaw;
-
-    if (args.audioPath) {
-      emit({ type: "log", step: "tts", message: "Chế độ Audio: Bỏ qua TTS, dùng file upload." });
-      await ensureDir(path.join(baseOut, "tts"));
-      await execFileP("ffmpeg", ["-y", "-i", args.audioPath, audioPathRaw]);
-      fittedAudioPath = audioPathRaw;
-    } else {
-      const ttsProvider =
-        args.tts ??
-        (args.geminiKey ? "gemini" : args.openaiKey ? "openai" : "macos");
-
-      for (let retry = 0; retry < 3; retry++) {
-        const voiceover = plan.scenes.map((s) => s.voiceover.trim()).join("\n");
-        const ttsInput = plan.audio_prompt ? plan.audio_prompt : voiceover;
-
-        if (ttsProvider === "gemini") {
-          if (!args.geminiKey) throw new Error("tts=gemini nhưng thiếu GEMINI_API_KEY.");
-          await geminiTtsToWav(ttsInput, audioPathRaw, args.geminiKey, args.voice);
-        } else if (ttsProvider === "openai") {
-          if (!args.openaiKey) throw new Error("tts=openai nhưng thiếu OPENAI_API_KEY.");
-          await openaiTtsToWav(voiceover, audioPathRaw, args.openaiKey);
-        } else {
-          await macosSayTtsToWav(voiceover, audioPathRaw);
-        }
-
-        const planTotalSec = plan.scenes.reduce((s, sc) => s + (sc.duration_sec ?? 0), 0);
-        const fit = await fitAudioToTargetDuration(audioPathRaw, audioPath, planTotalSec, 1.5);
-        fittedAudioPath = fit.path;
-
-        if (!fit.requiresRewrite) break;
-        if (!args.geminiKey) {
-          emit({
-            type: "log",
-            step: "audio_fit",
-            message: `Không có GEMINI_API_KEY để rewrite script, buộc speed-up cao (x${fit.factor.toFixed(2)}).`,
-          });
-          const forcedFit = await fitAudioToTargetDuration(audioPathRaw, audioPath, planTotalSec, 3);
-          fittedAudioPath = forcedFit.path;
-          break;
-        }
-        if (retry >= 2) {
-          throw new Error(
-            `Đã thử rút gọn voiceover nhiều lần nhưng vẫn quá dài (x${fit.factor.toFixed(2)}).`,
-          );
-        }
-        plan = await rewritePlanVoiceoverWithGemini(plan, planTotalSec, args.geminiKey, prefs);
-        emit({
-          type: "log",
-          step: "plan_rewrite",
-          message: `Đã rút gọn voiceover lần ${retry + 1} để giữ tốc đọc <= 1.5x`,
-        });
-      }
-    }
-
-    await ensureDir(path.join(baseOut, "plan"));
-    await writeJson(path.join(baseOut, "plan", "video_plan.json"), plan);
-
-    const mp4 = await renderRemotionVideo(baseOut, plan, fittedAudioPath, screenshotsMeta, prefs);
-    await qc(baseOut, mp4);
-
-    if (browser) await browser.close();
-    emit({ type: "done", projectDir: baseOut, mp4 });
+    // stage=full continues into render
+    await runRenderStage(plan, args, prefs, baseOut, screenshotsMeta);
   } catch (err) {
     emit({ type: "error", message: err instanceof Error ? err.message : String(err) });
     throw err;
+  } finally {
+    if (browser) {
+      await browser.close().catch(() => undefined);
+    }
   }
 }
 

@@ -35,55 +35,14 @@ export type YouTubeStoryV1Props = {
 };
 
 export const calcDurationInFrames = ({ props, fps }: { props: YouTubeStoryV1Props; fps: number }) => {
-  const totalSec = (props.scenes ?? []).reduce((s, sc) => s + (sc.duration_sec ?? 0), 0);
+  const totalSec = (props.scenes ?? []).reduce(
+    (s, sc) => s + Math.max(3, Math.min(12, sc.duration_sec ?? 5)),
+    0,
+  );
   return Math.max(Math.round((totalSec || 60) * fps), fps * 10);
 };
 
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
-
-const Watermarks: React.FC = () => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const t = frame / fps;
-  const floatY = Math.sin(t * 0.8) * 2;
-  const glow = 0.35 + (Math.sin(t * 1.2) + 1) * 0.08;
-
-  const badgeBase: React.CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    padding: "10px 14px",
-    borderRadius: 999,
-    background: "rgba(0,0,0,0.40)",
-    border: "1px solid rgba(0,255,255,0.26)",
-    boxShadow: `0 10px 28px rgba(0,0,0,0.55), 0 0 28px rgba(0,255,255,${glow})`,
-    backdropFilter: "blur(10px)",
-    color: "white",
-    fontSize: 20,
-    fontWeight: 700,
-    letterSpacing: 0.2,
-    textShadow: "0 2px 12px rgba(0,0,0,0.7)",
-    transform: `translateY(${floatY}px)`,
-  };
-
-  return (
-    <div style={{ pointerEvents: "none", width: "100%", maxWidth: 1600 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
-        <div style={badgeBase}>@radiobaomat</div>
-        <div
-          style={{
-            ...badgeBase,
-            borderColor: "rgba(255,0,255,0.26)",
-            boxShadow: `0 10px 28px rgba(0,0,0,0.55), 0 0 28px rgba(255,0,255,${glow})`,
-          }}
-        >
-          <span style={{ filter: "drop-shadow(0 0 10px rgba(255,0,255,0.6))" }}>♥</span>
-          <span>i-love-tiktok</span>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const ProgressBadge: React.FC<{ index: number; total: number }> = ({ index, total }) => {
   return (
@@ -330,8 +289,6 @@ const SceneView: React.FC<{
         }}
       >
         {showProgress ? <ProgressBadge index={sceneIndex} total={totalScenes} /> : null}
-        <Watermarks />
-
         {layout === "big_callout" ? (
           <div
             style={{

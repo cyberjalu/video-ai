@@ -1,4 +1,4 @@
-import { AlertTriangle, Clapperboard, Play, FileAudio, FileText } from "lucide-react";
+import { AlertTriangle, Clapperboard, Play, FileAudio, FileText, Images } from "lucide-react";
 import { motion } from "framer-motion";
 import { open } from "@tauri-apps/plugin-dialog";
 import { ArticlePreviewCard } from "../components/ArticlePreviewCard";
@@ -7,10 +7,11 @@ import { ScenePlanPanel } from "../components/ScenePlanPanel";
 import { VideoPreviewCard } from "../components/VideoPreviewCard";
 import { EmptyState } from "../components/EmptyState";
 import { PageTransition } from "../components/PageTransition";
+import { Card } from "../components/Card";
 import type { UiStep } from "../lib/generation";
 import type { GenerationStatus, VideoPlan } from "../lib/types";
 import { cn } from "../lib/cn";
-import { PrimaryButton } from "../components/Buttons";
+import { PrimaryButton, SecondaryButton } from "../components/Buttons";
 
 function VideoPlaceholder() {
   return (
@@ -52,10 +53,15 @@ export function YouTubeVideoPage({
   mp4Path,
   outputDir,
   plan,
+  onPlanChange,
   captionText,
   errorMessage,
   onCreateAnother,
   onCopyCaption,
+  onCancel,
+  onContinueRender,
+  onRerender,
+  hasPexelsKey,
 }: {
   audioPath: string;
   onChangeAudioPath: (p: string) => void;
@@ -75,14 +81,21 @@ export function YouTubeVideoPage({
   mp4Path?: string | null;
   outputDir?: string | null;
   plan?: VideoPlan | null;
+  onPlanChange?: (plan: VideoPlan) => void;
   captionText?: string | null;
   errorMessage?: string | null;
   onCreateAnother: () => void;
   onCopyCaption: () => void;
+  onCancel?: () => void;
+  onContinueRender?: () => void;
+  onRerender?: () => void;
+  hasPexelsKey?: boolean;
 }) {
   const showProgress = status !== "idle";
   const showArticle = !!articleTitle && status !== "idle";
   const showErrorPanel = status === "failed" && !!errorMessage;
+  const awaiting = status === "awaiting_assets";
+  const editablePlan = awaiting || status === "completed";
 
   async function handleSelectAudio() {
     const selected = await open({
@@ -181,7 +194,13 @@ export function YouTubeVideoPage({
         <div className="space-y-6 lg:col-span-7">
           {showProgress ? (
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
-              <GenerationStepper steps={steps} progressPercent={progressPercent} elapsedMs={elapsedMs} currentDescription={progressDescription} />
+              <GenerationStepper
+                steps={steps}
+                progressPercent={progressPercent}
+                elapsedMs={elapsedMs}
+                currentDescription={progressDescription}
+                onCancel={isBusy ? onCancel : undefined}
+              />
             </motion.div>
           ) : (
             <EmptyState
@@ -190,8 +209,31 @@ export function YouTubeVideoPage({
               icon={<Clapperboard className="h-4 w-4" />}
             />
           )}
+          {awaiting && onContinueRender ? (
+            <Card className="p-5">
+              <div className="flex items-start gap-3">
+                <Images className="mt-0.5 h-5 w-5 shrink-0 text-cyan-300" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold text-zinc-100">Attach visuals</div>
+                  <div className="mt-1 text-sm text-zinc-400">
+                    Upload image/video per scene, or continue — empty scenes fill from Pexels
+                    {hasPexelsKey ? "." : " (add API key in Settings)."}
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <PrimaryButton onClick={onContinueRender}>Continue render</PrimaryButton>
+                    <SecondaryButton onClick={onContinueRender}>Skip &amp; render</SecondaryButton>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          ) : null}
           {showArticle ? <ArticlePreviewCard title={articleTitle!} suggestedScenes={suggestedScenes ?? undefined} suggestedDurationSec={suggestedDurationSec ?? undefined} /> : null}
-          <ScenePlanPanel plan={plan} />
+          <ScenePlanPanel
+            plan={plan}
+            editable={editablePlan}
+            projectDir={outputDir}
+            onPlanChange={onPlanChange}
+          />
           {showErrorPanel ? (
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
               <EmptyState title="We couldn't finish this video" description={errorMessage!} icon={<AlertTriangle className="h-4 w-4 text-red-400" />} />
@@ -210,6 +252,7 @@ export function YouTubeVideoPage({
               captionText={captionText ?? null}
               onCreateAnother={onCreateAnother}
               onCopyCaption={onCopyCaption}
+              onRerender={onRerender}
             />
           ) : (
             <VideoPlaceholder />

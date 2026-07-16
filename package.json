@@ -1,16 +1,20 @@
 {
-  "name": "url-to-tiktok-video-tauri",
+  "name": "clipnews",
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "license": "MIT",
   "scripts": {
     "generate:css": "node generate-tailwind.cjs",
     "dev": "vite",
     "build": "node generate-tailwind.cjs && tsc && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "preview": "vite preview",
     "tauri": "tauri",
     "worker:render": "tsx ./worker/index.ts",
-    "render:openai": "tsx ./worker/index.ts --url \"https://openai.com/index/gpt-5-5-with-trusted-access-for-cyber/\""
+    "render:sample": "tsx ./worker/index.ts --url \"https://www.bbc.com/news\""
   },
   "dependencies": {
     "@fontsource/montserrat": "^5.2.8",
@@ -45,6 +49,7 @@
     "tailwindcss": "^4.3.0",
     "tsx": "^4.20.5",
     "typescript": "~5.8.3",
-    "vite": "^7.0.4"
+    "vite": "^7.0.4",
+    "vitest": "^3.2.7"
   }
 }

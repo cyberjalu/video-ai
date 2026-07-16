@@ -1,6 +1,12 @@
 import React, { useMemo } from "react";
-import { AbsoluteFill, Audio, Img, Sequence, Video, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Audio, Sequence, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { TechnicalGlitchBg } from "./TechnicalGlitchBg";
+import {
+  SceneVisual,
+  type ChartData,
+  type SceneLayout,
+  type StatData,
+} from "../components/SceneVisuals";
 
 // Montserrat (includes Vietnamese glyphs via latin-ext)
 import "@fontsource/montserrat/400.css";
@@ -16,12 +22,15 @@ export type NewsScene = {
   duration_sec: number;
   caption_lines: string[];
   voiceover: string;
-  layout?: "screenshot" | "big_callout" | "split" | "broll";
+  layout?: SceneLayout;
   callouts?: string[];
   screenshot_path?: string;
   screenshot_src?: string;
   broll_path?: string;
   broll_src?: string;
+  image_fit?: "cover" | "contain";
+  stat?: StatData;
+  chart?: ChartData;
 };
 
 export type NewsStoryV1Props = {
@@ -35,55 +44,14 @@ export type NewsStoryV1Props = {
 };
 
 export const calcDurationInFrames = ({ props, fps }: { props: NewsStoryV1Props; fps: number }) => {
-  const totalSec = (props.scenes ?? []).reduce((s, sc) => s + (sc.duration_sec ?? 0), 0);
+  const totalSec = (props.scenes ?? []).reduce(
+    (s, sc) => s + Math.max(3, Math.min(12, sc.duration_sec ?? 5)),
+    0,
+  );
   return Math.max(Math.round((totalSec || 60) * fps), fps * 10);
 };
 
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
-
-const Watermarks: React.FC = () => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const t = frame / fps;
-  const floatY = Math.sin(t * 0.8) * 2;
-  const glow = 0.35 + (Math.sin(t * 1.2) + 1) * 0.08;
-
-  const badgeBase: React.CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    padding: "10px 14px",
-    borderRadius: 999,
-    background: "rgba(0,0,0,0.40)",
-    border: "1px solid rgba(0,255,255,0.26)",
-    boxShadow: `0 10px 28px rgba(0,0,0,0.55), 0 0 28px rgba(0,255,255,${glow})`,
-    backdropFilter: "blur(10px)",
-    color: "white",
-    fontSize: 20,
-    fontWeight: 700,
-    letterSpacing: 0.2,
-    textShadow: "0 2px 12px rgba(0,0,0,0.7)",
-    transform: `translateY(${floatY}px)`,
-  };
-
-  return (
-    <div style={{ pointerEvents: "none", width: "100%", maxWidth: 920 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
-        <div style={badgeBase}>@radiobaomat</div>
-        <div
-          style={{
-            ...badgeBase,
-            borderColor: "rgba(255,0,255,0.26)",
-            boxShadow: `0 10px 28px rgba(0,0,0,0.55), 0 0 28px rgba(255,0,255,${glow})`,
-          }}
-        >
-          <span style={{ filter: "drop-shadow(0 0 10px rgba(255,0,255,0.6))" }}>♥</span>
-          <span>i-love-tiktok</span>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const ProgressBadge: React.FC<{ index: number; total: number }> = ({ index, total }) => {
   return (
@@ -157,111 +125,6 @@ const CalloutChips: React.FC<{ items: string[]; frame: number; enabled: boolean 
   );
 };
 
-const VisualCard: React.FC<{ src?: string; brollSrc?: string; layout?: string; frame: number; height: number }> = ({ src, brollSrc, layout, frame, height }) => {
-  if (layout === "broll" && brollSrc) {
-    return (
-      <div
-        style={{
-          width: "100%",
-          maxWidth: 920,
-          height,
-          borderRadius: 22,
-          overflow: "hidden",
-          position: "relative",
-          border: "1px solid rgba(0,255,255,0.18)",
-          boxShadow:
-            "0 18px 55px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,255,255,0.06) inset, 0 0 34px rgba(0,255,255,0.12)",
-          background: "rgba(0,0,0,0.25)",
-        }}
-      >
-        <Video
-          src={brollSrc}
-          muted
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            background: "linear-gradient(180deg, rgba(0,0,0,0.10) 0%, rgba(0,0,0,0.55) 100%)",
-          }}
-        />
-      </div>
-    );
-  }
-
-  if (!src) return null;
-  const t = interpolate(frame, [0, 20], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const scale = interpolate(t, [0, 1], [1.03, 1]);
-  const opacity = interpolate(t, [0, 0.25, 1], [0, 1, 1]);
-  return (
-    <div
-      style={{
-        width: "100%",
-        maxWidth: 920,
-        height,
-        borderRadius: 22,
-        overflow: "hidden",
-        position: "relative",
-        border: "1px solid rgba(0,255,255,0.18)",
-        boxShadow:
-          "0 18px 55px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,255,255,0.06) inset, 0 0 34px rgba(0,255,255,0.12)",
-        background: "rgba(0,0,0,0.25)",
-        transform: `scale(${scale})`,
-        opacity,
-      }}
-    >
-      <Img
-        src={src}
-        style={{
-          position: "absolute",
-          inset: 0,
-          width: "100%",
-          height: "100%",
-          objectFit: "cover",
-          filter: "blur(18px) contrast(1.05) saturate(1.05)",
-          opacity: 0.55,
-          transform: "scale(1.08)",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: 20,
-        }}
-      >
-        <Img
-          src={src}
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "contain",
-            filter: "contrast(1.06) saturate(1.06)",
-          }}
-        />
-      </div>
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          background: "linear-gradient(180deg, rgba(0,0,0,0.10) 0%, rgba(0,0,0,0.55) 100%)",
-        }}
-      />
-    </div>
-  );
-};
-
 const CutFlashOverlay: React.FC<{ cutFrames: number[] }> = ({ cutFrames }) => {
   const frame = useCurrentFrame();
   let intensity = 0;
@@ -330,40 +193,24 @@ const SceneView: React.FC<{
         }}
       >
         {showProgress ? <ProgressBadge index={sceneIndex} total={totalScenes} /> : null}
-        <Watermarks />
-
-        {layout === "big_callout" ? (
-          <div
-            style={{
-              width: "100%",
-              maxWidth: 920,
-              borderRadius: 20,
-              border: "1px solid rgba(0,255,255,0.22)",
-              background: "linear-gradient(130deg, rgba(4,26,39,0.76) 0%, rgba(22,9,49,0.68) 100%)",
-              padding: "36px 30px",
-              boxShadow: "0 24px 50px rgba(0,0,0,0.52), 0 0 22px rgba(0,255,255,0.2)",
-            }}
-          >
-            <div
-              style={{
-                color: "white",
-                fontSize: clamp(64 - Math.max(0, bigCalloutText.length - 16) * 0.5, 42, 64),
-                fontWeight: 700,
-                lineHeight: 1.08,
-                textShadow: "0 8px 24px rgba(0,0,0,0.6)",
-              }}
-            >
-              {bigCalloutText}
-            </div>
-          </div>
-        ) : (
-          <VisualCard src={scene.screenshot_src} brollSrc={scene.broll_src} layout={layout} frame={frame} height={cardHeight} />
-        )}
+        <SceneVisual
+          layout={layout}
+          screenshotSrc={scene.screenshot_src}
+          brollSrc={scene.broll_src}
+          stat={scene.stat}
+          chart={scene.chart}
+          calloutText={bigCalloutText}
+          imageFit={scene.image_fit}
+          frame={frame}
+          height={cardHeight}
+          durationInFrames={durationInFrames}
+          theme="neon"
+        />
 
         <CalloutChips
           items={callouts}
           frame={frame}
-          enabled={showCallouts && layout === "big_callout"}
+          enabled={showCallouts && (layout === "big_callout" || layout === "stat")}
         />
 
         <div

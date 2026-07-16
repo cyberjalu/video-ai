@@ -4,6 +4,7 @@ export type UiStepId =
   | "reading_article"
   | "capturing_screenshots"
   | "writing_script"
+  | "awaiting_assets"
   | "generating_voiceover"
   | "rendering_video"
   | "finalizing_export"
@@ -24,8 +25,9 @@ export type UiStep = {
 export const UI_STEP_ORDER: Array<{ id: UiStepId; label: string; worker: WorkerStep[] }> = [
   { id: "reading_article", label: "Reading article", worker: ["extract"] },
   { id: "capturing_screenshots", label: "Capturing screenshots", worker: ["screenshot"] },
-  { id: "writing_script", label: "Writing video script", worker: ["plan", "plan_rewrite", "fetch_broll"] },
-  { id: "generating_voiceover", label: "Generating voiceover", worker: ["tts", "audio_fit"] },
+  { id: "writing_script", label: "Writing video script", worker: ["plan", "plan_rewrite"] },
+  { id: "awaiting_assets", label: "Attach visuals", worker: [] },
+  { id: "generating_voiceover", label: "Generating voiceover", worker: ["tts", "audio_fit", "fetch_broll"] },
   { id: "rendering_video", label: "Rendering video", worker: ["render"] },
   { id: "finalizing_export", label: "Finalizing export", worker: ["qc"] },
 ];
@@ -61,6 +63,21 @@ export function applyWorkerEventToSteps(
   }
 
   if (e.type === "done") {
+    if (e.planReady) {
+      const next = steps.map((s): UiStep => {
+        if (s.id === "awaiting_assets") return { ...s, state: "running" };
+        if (
+          s.id === "reading_article" ||
+          s.id === "capturing_screenshots" ||
+          s.id === "writing_script"
+        ) {
+          return { ...s, state: "completed" };
+        }
+        if (s.state === "running") return { ...s, state: "completed" };
+        return s;
+      });
+      return { steps: next, status: "awaiting_assets" };
+    }
     const next = steps.map((s) =>
       s.state === "completed"
         ? s
@@ -69,6 +86,22 @@ export function applyWorkerEventToSteps(
           : { ...s, state: "completed" as UiStepState },
     );
     return { steps: next, status: "completed" };
+  }
+
+  if (e.type === "plan_ready") {
+    const next = steps.map((s): UiStep => {
+      if (s.id === "awaiting_assets") return { ...s, state: "running" };
+      if (
+        s.id === "reading_article" ||
+        s.id === "capturing_screenshots" ||
+        s.id === "writing_script"
+      ) {
+        return { ...s, state: "completed" };
+      }
+      if (s.state === "running") return { ...s, state: "completed" };
+      return s;
+    });
+    return { steps: next, status: "awaiting_assets" };
   }
 
   if (e.type === "step_start") {
@@ -95,19 +128,37 @@ export function applyWorkerEventToSteps(
 }
 
 export function friendlyErrorMessage(raw: string) {
-  const msg = raw.toLowerCase();
+  const trimmed = (raw ?? "").trim();
+  if (!trimmed) return "Something went wrong while generating your video. Please try again.";
+
+  const msg = trimmed.toLowerCase();
   if (msg.includes("paywall") || msg.includes("403") || msg.includes("blocked")) {
     return "We couldn’t read this article. Try another URL or check if the page is behind a paywall.";
+  }
+  if (msg.includes("missing required binary") || msg.includes("ffmpeg") || msg.includes("ffprobe")) {
+    return trimmed;
   }
   if (msg.includes("screenshot")) {
     return "Screenshot capture failed. The site may block automated browsing.";
   }
-  if (msg.includes("tts") || msg.includes("voice")) {
-    return "Voice generation failed. Please try again.";
+  if (msg.includes("gemini api") || msg.includes("api key") || msg.includes("thiếu gemini")) {
+    return trimmed;
   }
   if (msg.includes("permission") || msg.includes("eacces")) {
     return "Render failed. Check output folder permissions.";
   }
-  return "Something went wrong while generating your video. Please try again.";
+  // Prefer the worker's concrete message for debugging / OSS users.
+  if (trimmed.length <= 280 && !msg.includes("worker exited with code")) {
+    return trimmed;
+  }
+  return trimmed.length > 280 ? `${trimmed.slice(0, 280)}…` : trimmed;
 }
+
+/** Map dub worker step names → UI stepper ids */
+export const DUB_WORKER_TO_UI: Record<string, UiStepId> = {
+  extract_original_audio: "extracting_audio",
+  transcribe_original: "transcribing",
+  generate_dub_tts: "generating_voiceover",
+  merge_dub_video: "merging_audio",
+};
 
