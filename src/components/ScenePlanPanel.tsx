@@ -1,25 +1,23 @@
-import { ChevronDown, ImagePlus, Layers3, Trash2, Video } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ChevronDown, ImagePlus, Layers3, Plus, Trash2, Video } from "lucide-react";
+import { motion } from "framer-motion";
 import { open } from "@tauri-apps/plugin-dialog";
 import { cn } from "../lib/cn";
 import type { VideoPlan } from "../lib/types";
-import { clearSceneAsset, copySceneAsset, toAssetSrc, writePlanJson } from "../lib/tauri";
+import {
+  MAX_SCENES,
+  MIN_SCENES,
+  canAddScene,
+  canRemoveScene,
+  clampSceneDuration,
+  createBlankScene,
+  roleLabel,
+  sumDurations,
+} from "../lib/scenePlan";
+import { clearSceneAsset, clearTtsCache, copySceneAsset, toAssetSrc, writePlanJson } from "../lib/tauri";
 import { Card } from "./Card";
 import { EmptyState } from "./EmptyState";
 import { SecondaryButton } from "./Buttons";
-
-function roleLabel(role: string) {
-  const map: Record<string, string> = {
-    hook: "Hook",
-    re_hook: "Re-hook",
-    why_matters: "Why it matters",
-    what_happened: "What happened",
-    evidence: "Proof",
-    context: "Context",
-    impact: "Impact",
-    takeaway: "CTA",
-  };
-  return map[role] ?? role;
-}
 
 function layoutBadge(layout?: string) {
   if (!layout) return null;
@@ -29,6 +27,81 @@ function layoutBadge(layout?: string) {
     <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-200">
       {label}
     </span>
+  );
+}
+
+function SceneScriptEditor({
+  sceneId,
+  voiceover,
+  captionLines,
+  onCommit,
+}: {
+  sceneId: string;
+  voiceover: string;
+  captionLines: string[];
+  onCommit: (sceneId: string, next: { voiceover: string; caption_lines: string[] }) => void;
+}) {
+  const captionKey = captionLines.join("\n");
+  const [draftVoiceover, setDraftVoiceover] = useState(voiceover);
+  const [draftCaptions, setDraftCaptions] = useState(captionKey);
+
+  useEffect(() => {
+    setDraftVoiceover(voiceover);
+  }, [voiceover, sceneId]);
+
+  useEffect(() => {
+    setDraftCaptions(captionKey);
+  }, [captionKey, sceneId]);
+
+  function commit() {
+    const nextVoiceover = draftVoiceover.trim();
+    const nextCaptions = draftCaptions
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .slice(0, 2);
+    const captions =
+      nextCaptions.length > 0 ? nextCaptions : captionLines.length > 0 ? captionLines : [nextVoiceover.slice(0, 48) || "…"];
+
+    const voiceChanged = nextVoiceover !== voiceover.trim();
+    const captionChanged = captions.join("\n") !== captionLines.filter(Boolean).join("\n");
+    if (!voiceChanged && !captionChanged) return;
+
+    onCommit(sceneId, {
+      voiceover: nextVoiceover || voiceover,
+      caption_lines: captions,
+    });
+  }
+
+  return (
+    <div className="mt-3 space-y-2">
+      <label className="block">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+          Voiceover / script
+        </span>
+        <textarea
+          value={draftVoiceover}
+          onChange={(e) => setDraftVoiceover(e.target.value)}
+          onBlur={() => commit()}
+          rows={3}
+          className="mt-1 w-full resize-y rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm leading-relaxed text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-cyan-400/30 focus:ring-1 focus:ring-cyan-400/20"
+          placeholder="Script for this scene…"
+        />
+      </label>
+      <label className="block">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+          Captions <span className="font-normal normal-case tracking-normal text-zinc-600">(1–2 lines)</span>
+        </span>
+        <textarea
+          value={draftCaptions}
+          onChange={(e) => setDraftCaptions(e.target.value)}
+          onBlur={() => commit()}
+          rows={2}
+          className="mt-1 w-full resize-y rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm leading-relaxed text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-cyan-400/30 focus:ring-1 focus:ring-cyan-400/20"
+          placeholder="On-screen caption lines…"
+        />
+      </label>
+    </div>
   );
 }
 
@@ -56,10 +129,17 @@ export function ScenePlanPanel({
   const currentPlan: VideoPlan = plan;
   const canEdit = editable && !!projectDir && !!onPlanChange;
 
-  async function persist(next: VideoPlan) {
+  async function persist(next: VideoPlan, options?: { invalidateTts?: boolean }) {
     if (!projectDir || !onPlanChange) return;
     onPlanChange(next);
     await writePlanJson(projectDir, next);
+    if (options?.invalidateTts) {
+      try {
+        await clearTtsCache(projectDir);
+      } catch {
+        /* best-effort; worker also checks voiceover fingerprint */
+      }
+    }
   }
 
   async function attachFile(sceneId: string, kind: "image" | "video") {
@@ -74,8 +154,7 @@ export function ScenePlanPanel({
     if (!selected || Array.isArray(selected)) return;
     const dest = await copySceneAsset(projectDir, sceneId, selected);
     const next: VideoPlan = {
-      title: currentPlan.title,
-      target_duration_sec: currentPlan.target_duration_sec,
+      ...currentPlan,
       scenes: currentPlan.scenes.map((s) => {
         if (s.id !== sceneId) return s;
         if (kind === "video") {
@@ -106,8 +185,7 @@ export function ScenePlanPanel({
     if (!projectDir || !onPlanChange) return;
     await clearSceneAsset(projectDir, sceneId);
     const next: VideoPlan = {
-      title: currentPlan.title,
-      target_duration_sec: currentPlan.target_duration_sec,
+      ...currentPlan,
       scenes: currentPlan.scenes.map((s) =>
         s.id === sceneId
           ? {
@@ -123,13 +201,94 @@ export function ScenePlanPanel({
     await persist(next);
   }
 
+  async function commitScript(
+    sceneId: string,
+    nextFields: { voiceover: string; caption_lines: string[] },
+  ) {
+    if (!projectDir || !onPlanChange) return;
+    const scene = currentPlan.scenes.find((s) => s.id === sceneId);
+    if (!scene) return;
+
+    const voiceChanged = nextFields.voiceover.trim() !== scene.voiceover.trim();
+    const next: VideoPlan = {
+      ...currentPlan,
+      scenes: currentPlan.scenes.map((s) =>
+        s.id === sceneId
+          ? {
+              ...s,
+              voiceover: nextFields.voiceover,
+              caption_lines: nextFields.caption_lines,
+            }
+          : s,
+      ),
+    };
+    // Stale Gemini TTS prompt would ignore edited voiceover — drop it.
+    if (voiceChanged) {
+      delete next.audio_prompt;
+    }
+    await persist(next, { invalidateTts: voiceChanged });
+  }
+
+  async function addScene() {
+    if (!projectDir || !onPlanChange) return;
+    if (currentPlan.scenes.length >= MAX_SCENES) return;
+
+    const scenes = [...currentPlan.scenes, createBlankScene(currentPlan.scenes)];
+    const next: VideoPlan = {
+      ...currentPlan,
+      scenes,
+      target_duration_sec: sumDurations(scenes),
+    };
+    delete next.audio_prompt;
+    await persist(next, { invalidateTts: true });
+  }
+
+  async function removeScene(sceneId: string) {
+    if (!projectDir || !onPlanChange) return;
+    if (currentPlan.scenes.length <= MIN_SCENES) return;
+
+    const scenes = currentPlan.scenes.filter((s) => s.id !== sceneId);
+    if (scenes.length === currentPlan.scenes.length) return;
+
+    try {
+      await clearSceneAsset(projectDir, sceneId);
+    } catch {
+      /* asset folder may not exist for blank scenes */
+    }
+
+    const next: VideoPlan = {
+      ...currentPlan,
+      scenes,
+      target_duration_sec: sumDurations(scenes),
+    };
+    delete next.audio_prompt;
+    await persist(next, { invalidateTts: true });
+  }
+
+  async function commitDuration(sceneId: string, raw: number) {
+    if (!projectDir || !onPlanChange) return;
+    const duration_sec = clampSceneDuration(raw);
+    const scenes = currentPlan.scenes.map((s) =>
+      s.id === sceneId ? { ...s, duration_sec } : s,
+    );
+    const next: VideoPlan = {
+      ...currentPlan,
+      scenes,
+      target_duration_sec: sumDurations(scenes),
+    };
+    await persist(next);
+  }
+
+  const showAddScene = canEdit && canAddScene(currentPlan.scenes.length);
+  const showRemoveScene = canEdit && canRemoveScene(currentPlan.scenes.length);
+
   return (
     <details className="group" open={canEdit || undefined}>
       <summary className="list-none">
-        <Card className="cursor-pointer p-5 transition hover:bg-zinc-900/70">
+        <Card className="cursor-pointer p-5 transition-all duration-200 hover:-translate-y-px hover:border-cyan-300/15 hover:bg-zinc-900/70">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
-              <Layers3 className="h-4 w-4 text-zinc-300" />
+              <Layers3 className="h-4 w-4 text-cyan-200/80" />
               Scene plan
               <span className="ml-2 text-xs font-semibold text-zinc-400">
                 {currentPlan.scenes.length} scenes · {currentPlan.target_duration_sec}s
@@ -139,13 +298,38 @@ export function ScenePlanPanel({
           </div>
           <div className="mt-2 text-sm text-zinc-400">
             {canEdit
-              ? "Attach an image or video per scene. Empty scenes auto-fill from Pexels when you continue."
+              ? "Edit voiceover, duration, scenes, and media. Empty scenes auto-fill from Pexels when you continue."
               : "Optional details for advanced users. You can skim or ignore this section."}
           </div>
         </Card>
       </summary>
 
       <div className="mt-3 space-y-2">
+        {canEdit ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/[0.06] bg-black/25 px-3 py-2.5">
+            <div className="text-xs text-zinc-500">
+              {currentPlan.scenes.length}/{MAX_SCENES} scenes · min {MIN_SCENES} required
+            </div>
+            <SecondaryButton
+              type="button"
+              className="rounded-xl px-3 py-2 text-xs"
+              disabled={!showAddScene}
+              onClick={(e) => {
+                e.preventDefault();
+                void addScene();
+              }}
+              title={
+                showAddScene
+                  ? "Append a new scene before voiceover"
+                  : `Maximum ${MAX_SCENES} scenes`
+              }
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add scene
+            </SecondaryButton>
+          </div>
+        ) : null}
+
         {currentPlan.scenes.map((s, idx) => {
           const thumb = s.screenshot_path ? toAssetSrc(s.screenshot_path) : null;
           const caption = s.caption_lines?.filter(Boolean).join(" · ");
@@ -155,11 +339,19 @@ export function ScenePlanPanel({
           );
 
           return (
-            <Card key={s.id} className="p-4">
+            <motion.div
+              key={s.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.28, delay: idx * 0.035, ease: [0.22, 1, 0.36, 1] }}
+            >
+            <Card
+              className="p-4 transition-all duration-200 hover:border-white/[0.1]"
+            >
               <div className="flex gap-4">
                 <div
                   className={cn(
-                    "h-[72px] w-[128px] overflow-hidden rounded-xl border border-white/10 bg-black/40",
+                    "h-[72px] w-[128px] shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/40",
                     !thumb && !hasVideo ? "grid place-items-center text-xs text-zinc-500" : "",
                   )}
                 >
@@ -178,11 +370,12 @@ export function ScenePlanPanel({
                   <div className="flex items-center justify-between gap-3">
                     <div className="truncate text-sm font-semibold text-zinc-100">
                       Scene {idx + 1} · {roleLabel(s.role)}
+                      <span className="ml-1.5 font-normal text-zinc-600">({s.id})</span>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       {layoutBadge(s.layout)}
                       {hasVideo ? (
-                        <span className="rounded-full border border-violet-400/20 bg-violet-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-200">
+                        <span className="rounded-full border border-sky-400/20 bg-sky-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-200">
                           broll
                         </span>
                       ) : null}
@@ -191,10 +384,58 @@ export function ScenePlanPanel({
                           pexels
                         </span>
                       ) : null}
-                      <div className="text-xs font-semibold text-zinc-400">{s.duration_sec}s</div>
+                      {canEdit ? (
+                        <label className="flex items-center gap-1 text-xs font-semibold text-zinc-400">
+                          <input
+                            type="number"
+                            min={3}
+                            max={12}
+                            value={s.duration_sec}
+                            onChange={(e) => {
+                              const v = Number(e.currentTarget.value);
+                              if (Number.isFinite(v)) void commitDuration(s.id, v);
+                            }}
+                            className="w-10 rounded-lg border border-white/10 bg-black/40 px-1.5 py-0.5 text-center text-zinc-200 outline-none focus:border-cyan-400/30"
+                            aria-label={`Duration for scene ${idx + 1}`}
+                          />
+                          s
+                        </label>
+                      ) : (
+                        <div className="text-xs font-semibold text-zinc-400">{s.duration_sec}s</div>
+                      )}
+                      {showRemoveScene ? (
+                        <SecondaryButton
+                          type="button"
+                          className="rounded-lg px-2 py-1.5 text-xs text-zinc-400 hover:text-red-300"
+                          title="Remove scene"
+                          aria-label={`Remove scene ${idx + 1}`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            void removeScene(s.id);
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </SecondaryButton>
+                      ) : null}
                     </div>
                   </div>
-                  {caption ? <div className="mt-1 text-sm text-zinc-300">{caption}</div> : null}
+
+                  {canEdit ? (
+                    <SceneScriptEditor
+                      sceneId={s.id}
+                      voiceover={s.voiceover}
+                      captionLines={s.caption_lines ?? []}
+                      onCommit={(id, fields) => void commitScript(id, fields)}
+                    />
+                  ) : (
+                    <>
+                      {caption ? <div className="mt-1 text-sm text-zinc-300">{caption}</div> : null}
+                      {s.voiceover ? (
+                        <div className="mt-1 line-clamp-2 text-sm text-zinc-400">{s.voiceover}</div>
+                      ) : null}
+                    </>
+                  )}
+
                   {s.pexels_query ? (
                     <div className="mt-1 text-[11px] text-zinc-500">Query: {s.pexels_query}</div>
                   ) : null}
@@ -247,8 +488,20 @@ export function ScenePlanPanel({
                 </div>
               </div>
             </Card>
+            </motion.div>
           );
         })}
+
+        {showAddScene ? (
+          <button
+            type="button"
+            onClick={() => void addScene()}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-cyan-300/25 bg-cyan-300/[0.04] px-4 py-3.5 text-sm font-semibold text-cyan-100/90 transition-all duration-200 hover:-translate-y-px hover:border-cyan-300/40 hover:bg-cyan-300/[0.08] active:translate-y-0"
+          >
+            <Plus className="h-4 w-4" />
+            Add scene
+          </button>
+        ) : null}
       </div>
     </details>
   );

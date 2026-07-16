@@ -69,12 +69,12 @@ export function Sidebar({
                 id={`nav-${item.id}`}
                 onClick={() => item.enabled && onNavigate(item.id)}
                 className={cn(
-                  "group relative flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm font-medium transition-all duration-200",
+                  "group relative flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm font-medium transition-all duration-200 active:scale-[0.99]",
                   item.enabled ? "cursor-pointer" : "cursor-not-allowed opacity-40",
                   isActive
                     ? "border border-cyan-300/15 bg-[linear-gradient(180deg,rgba(99,214,243,0.12),rgba(255,255,255,0.03))] text-zinc-50 shadow-[0_10px_28px_rgba(24,105,132,0.16)]"
                     : item.enabled
-                      ? "border border-transparent text-zinc-400 hover:border-white/[0.05] hover:bg-white/[0.04] hover:text-zinc-200"
+                      ? "border border-transparent text-zinc-400 hover:border-white/[0.05] hover:bg-white/[0.04] hover:text-zinc-200 hover:translate-x-px"
                       : "text-zinc-600",
                 )}
                 aria-disabled={!item.enabled}

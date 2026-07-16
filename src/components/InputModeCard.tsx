@@ -142,7 +142,7 @@ export function InputModeCard({
                     ? "border-red-400/40 ring-1 ring-red-400/10"
                     : disabled
                       ? "border-white/[0.05] opacity-60"
-                      : "border-white/[0.09] focus-within:border-violet-400/40 focus-within:ring-1 focus-within:ring-violet-400/10 focus-within:shadow-[0_0_20px_rgba(139,92,246,0.06)]",
+                      : "border-white/[0.09] focus-within:border-cyan-400/40 focus-within:ring-1 focus-within:ring-cyan-400/10 focus-within:shadow-[0_0_20px_rgba(34,211,238,0.06)]",
                 )}
               >
                 <FileText
@@ -164,7 +164,7 @@ export function InputModeCard({
                   aria-describedby={error ? "url-error" : undefined}
                 />
                 {isLoading && (
-                  <Loader2 className="h-4 w-4 shrink-0 animate-spin text-violet-400 mt-0.5" />
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin text-cyan-400 mt-0.5" />
                 )}
               </div>
             </label>

@@ -1,4 +1,4 @@
-import { AlertTriangle, Clapperboard, Play, FileAudio, FileText, Images } from "lucide-react";
+import { AlertTriangle, Clapperboard, Play, FileAudio, FileText } from "lucide-react";
 import { motion } from "framer-motion";
 import { open } from "@tauri-apps/plugin-dialog";
 import { ArticlePreviewCard } from "../components/ArticlePreviewCard";
@@ -7,11 +7,10 @@ import { ScenePlanPanel } from "../components/ScenePlanPanel";
 import { VideoPreviewCard } from "../components/VideoPreviewCard";
 import { EmptyState } from "../components/EmptyState";
 import { PageTransition } from "../components/PageTransition";
-import { Card } from "../components/Card";
 import type { UiStep } from "../lib/generation";
 import type { GenerationStatus, VideoPlan } from "../lib/types";
 import { cn } from "../lib/cn";
-import { PrimaryButton, SecondaryButton } from "../components/Buttons";
+import { PrimaryButton } from "../components/Buttons";
 
 function VideoPlaceholder() {
   return (
@@ -200,6 +199,9 @@ export function YouTubeVideoPage({
                 elapsedMs={elapsedMs}
                 currentDescription={progressDescription}
                 onCancel={isBusy ? onCancel : undefined}
+                awaitingAssets={awaiting}
+                onContinueRender={onContinueRender}
+                hasPexelsKey={hasPexelsKey}
               />
             </motion.div>
           ) : (
@@ -209,24 +211,6 @@ export function YouTubeVideoPage({
               icon={<Clapperboard className="h-4 w-4" />}
             />
           )}
-          {awaiting && onContinueRender ? (
-            <Card className="p-5">
-              <div className="flex items-start gap-3">
-                <Images className="mt-0.5 h-5 w-5 shrink-0 text-cyan-300" />
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold text-zinc-100">Attach visuals</div>
-                  <div className="mt-1 text-sm text-zinc-400">
-                    Upload image/video per scene, or continue — empty scenes fill from Pexels
-                    {hasPexelsKey ? "." : " (add API key in Settings)."}
-                  </div>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <PrimaryButton onClick={onContinueRender}>Continue render</PrimaryButton>
-                    <SecondaryButton onClick={onContinueRender}>Skip &amp; render</SecondaryButton>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          ) : null}
           {showArticle ? <ArticlePreviewCard title={articleTitle!} suggestedScenes={suggestedScenes ?? undefined} suggestedDurationSec={suggestedDurationSec ?? undefined} /> : null}
           <ScenePlanPanel
             plan={plan}

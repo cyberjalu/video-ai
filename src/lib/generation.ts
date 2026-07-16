@@ -22,11 +22,11 @@ export type UiStep = {
   detail?: string;
 };
 
-export const UI_STEP_ORDER: Array<{ id: UiStepId; label: string; worker: WorkerStep[] }> = [
+export const UI_STEP_ORDER: Array<{ id: UiStepId; label: string; worker: WorkerStep[]; detail?: string }> = [
   { id: "reading_article", label: "Reading article", worker: ["extract"] },
   { id: "capturing_screenshots", label: "Capturing screenshots", worker: ["screenshot"] },
   { id: "writing_script", label: "Writing video script", worker: ["plan", "plan_rewrite"] },
-  { id: "awaiting_assets", label: "Attach visuals", worker: [] },
+  { id: "awaiting_assets", label: "Script & visuals", worker: [], detail: "Edit voiceover, add scenes, attach media" },
   { id: "generating_voiceover", label: "Generating voiceover", worker: ["tts", "audio_fit", "fetch_broll"] },
   { id: "rendering_video", label: "Rendering video", worker: ["render"] },
   { id: "finalizing_export", label: "Finalizing export", worker: ["qc"] },
@@ -37,7 +37,12 @@ export function statusFromUiStepId(id: UiStepId): GenerationStatus {
 }
 
 export function initialSteps(): UiStep[] {
-  return UI_STEP_ORDER.map((s) => ({ id: s.id, label: s.label, state: "pending" }));
+  return UI_STEP_ORDER.map((s) => ({
+    id: s.id,
+    label: s.label,
+    state: "pending",
+    detail: "detail" in s ? s.detail : undefined,
+  }));
 }
 
 export function findUiStepIdFromWorkerStep(step: WorkerStep): UiStepId | null {

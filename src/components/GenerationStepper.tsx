@@ -1,9 +1,9 @@
-import { CheckCircle2, Circle, Loader2, XCircle } from "lucide-react";
+import { CheckCircle2, Circle, Images, Loader2, XCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "../lib/cn";
 import type { UiStep } from "../lib/generation";
 import { Card } from "./Card";
-import { SecondaryButton } from "./Buttons";
+import { PrimaryButton, SecondaryButton } from "./Buttons";
 
 function formatElapsed(ms: number) {
   const sec = Math.max(0, Math.floor(ms / 1000));
@@ -18,12 +18,18 @@ export function GenerationStepper({
   elapsedMs,
   currentDescription,
   onCancel,
+  awaitingAssets = false,
+  onContinueRender,
+  hasPexelsKey = false,
 }: {
   steps: UiStep[];
   progressPercent: number;
   elapsedMs: number;
   currentDescription?: string;
   onCancel?: () => void;
+  awaitingAssets?: boolean;
+  onContinueRender?: () => void;
+  hasPexelsKey?: boolean;
 }) {
   return (
     <Card variant="strong" className="overflow-hidden p-6">
@@ -31,7 +37,9 @@ export function GenerationStepper({
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="eyebrow-label mb-2">Broadcast Pipeline</div>
-          <div className="display-title text-[28px] leading-none text-zinc-100">Rendering in progress</div>
+          <div className="display-title text-[28px] leading-none text-zinc-100">
+            {awaitingAssets ? "Your turn — script & visuals" : "Rendering in progress"}
+          </div>
         </div>
         <div className="flex flex-col items-end gap-2">
           <div className="rounded-2xl border border-white/[0.07] bg-white/[0.03] px-3 py-2 text-right">
@@ -83,10 +91,29 @@ export function GenerationStepper({
         ) : null}
       </AnimatePresence>
 
+      {awaitingAssets && onContinueRender ? (
+        <div className="mt-4 rounded-[20px] border border-cyan-300/25 bg-cyan-300/10 px-4 py-4">
+          <div className="text-sm font-semibold text-zinc-100">Plan is ready — edit script &amp; visuals</div>
+          <div className="mt-1 text-sm text-zinc-400">
+            Tweak voiceover per scene, add or remove scenes, then attach image/video. Empty scenes
+            {hasPexelsKey ? " auto-fill from Pexels when you continue." : " need a Pexels key in Settings (or upload files)."}
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <PrimaryButton type="button" onClick={onContinueRender}>
+              Continue render
+            </PrimaryButton>
+            <SecondaryButton type="button" onClick={onContinueRender}>
+              Skip &amp; render
+            </SecondaryButton>
+          </div>
+        </div>
+      ) : null}
+
       {/* Steps */}
       <div className="mt-5 space-y-2">
         {steps.map((s, index) => {
-          const isRunning = s.state === "running";
+          const isAwaitingStep = awaitingAssets && s.id === "awaiting_assets" && s.state === "running";
+          const isRunning = s.state === "running" && !isAwaitingStep;
           const isDone = s.state === "completed";
           const isFailed = s.state === "failed";
 
@@ -98,16 +125,19 @@ export function GenerationStepper({
               transition={{ duration: 0.25, delay: index * 0.04 }}
               className={cn(
                 "relative flex items-center gap-3 overflow-hidden rounded-[20px] border px-4 py-3 transition-all duration-300",
-                isRunning
-                  ? "border-cyan-300/25 bg-[linear-gradient(180deg,rgba(99,214,243,0.12),rgba(255,255,255,0.03))] shadow-[0_12px_40px_rgba(24,105,132,0.16)]"
-                  : isDone
-                    ? "border-emerald-400/12 bg-emerald-400/5"
-                    : isFailed
-                      ? "border-red-400/15 bg-red-400/5"
-                      : "border-white/[0.05] bg-black/20",
+                isAwaitingStep
+                  ? "border-amber-300/30 bg-[linear-gradient(180deg,rgba(251,191,36,0.12),rgba(255,255,255,0.03))]"
+                  : isRunning
+                    ? "border-cyan-300/25 bg-[linear-gradient(180deg,rgba(99,214,243,0.12),rgba(255,255,255,0.03))] shadow-[0_12px_40px_rgba(24,105,132,0.16)]"
+                    : isDone
+                      ? "border-emerald-400/12 bg-emerald-400/5"
+                      : isFailed
+                        ? "border-red-400/15 bg-red-400/5"
+                        : "border-white/[0.05] bg-black/20",
               )}
             >
               {isRunning && <div className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-cyan-300" />}
+              {isAwaitingStep && <div className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-amber-300" />}
               {isRunning && (
                 <div className="ambient-breathe pointer-events-none absolute right-[-3rem] top-1/2 h-20 w-20 -translate-y-1/2 rounded-full bg-cyan-300/12 blur-2xl" />
               )}
@@ -117,6 +147,8 @@ export function GenerationStepper({
                   <CheckCircle2 className="h-4 w-4 text-emerald-400" />
                 ) : isFailed ? (
                   <XCircle className="h-4 w-4 text-red-400" />
+                ) : isAwaitingStep ? (
+                  <Images className="h-4 w-4 text-amber-300" />
                 ) : isRunning ? (
                   <Loader2 className="h-4 w-4 animate-spin text-cyan-300" />
                 ) : (
@@ -130,7 +162,7 @@ export function GenerationStepper({
                   <div
                     className={cn(
                       "truncate text-sm font-semibold uppercase tracking-[0.08em] transition-colors",
-                      isRunning
+                      isAwaitingStep || isRunning
                         ? "text-zinc-100"
                         : isDone
                           ? "text-zinc-300"
@@ -148,12 +180,22 @@ export function GenerationStepper({
                         ? "text-emerald-400"
                         : isFailed
                           ? "text-red-400"
-                          : isRunning
-                            ? "text-cyan-300"
-                            : "text-zinc-700",
+                          : isAwaitingStep
+                            ? "text-amber-300"
+                            : isRunning
+                              ? "text-cyan-300"
+                              : "text-zinc-700",
                     )}
                   >
-                    {isDone ? "Done" : isFailed ? "Failed" : isRunning ? "Running" : "Pending"}
+                    {isDone
+                      ? "Done"
+                      : isFailed
+                        ? "Failed"
+                        : isAwaitingStep
+                          ? "Your turn"
+                          : isRunning
+                            ? "Running"
+                            : "Pending"}
                   </div>
                 </div>
                 {s.detail ? (

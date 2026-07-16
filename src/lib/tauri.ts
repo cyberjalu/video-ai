@@ -68,6 +68,11 @@ export async function clearSceneAsset(projectDir: string, sceneId: string) {
   return invoke("clear_scene_asset", { projectDir, sceneId });
 }
 
+/** Invalidate cached TTS so the next render regenerates voiceover from the edited script. */
+export async function clearTtsCache(projectDir: string) {
+  return invoke("clear_tts_cache", { projectDir });
+}
+
 export function toAssetSrc(filePath: string) {
   return convertFileSrc(filePath);
 }

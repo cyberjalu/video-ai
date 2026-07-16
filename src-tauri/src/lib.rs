@@ -420,6 +420,36 @@ fn clear_scene_asset(project_dir: String, scene_id: String) -> Result<(), String
     Ok(())
 }
 
+/// Delete cached TTS wavs so the next render regenerates voiceover from the plan script.
+#[tauri::command]
+fn clear_tts_cache(project_dir: String) -> Result<(), String> {
+    if project_dir.trim().is_empty() {
+        return Err("Missing project_dir".into());
+    }
+    let workdir = project_root();
+    assert_under_output(&workdir, &project_dir)?;
+
+    let tts_dir = PathBuf::from(&project_dir).join("tts");
+    if !tts_dir.is_dir() {
+        return Ok(());
+    }
+    let entries = std::fs::read_dir(&tts_dir).map_err(|e| format!("Cannot read tts dir: {e}"))?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let name = entry.file_name();
+        let name_str = name.to_string_lossy().to_lowercase();
+        let is_voiceover = name_str.starts_with("voiceover")
+            && (name_str.ends_with(".wav")
+                || name_str.ends_with(".aiff")
+                || name_str.ends_with(".txt")
+                || name_str.ends_with(".raw.wav"));
+        if is_voiceover || name_str == "voiceover.source.txt" {
+            let _ = std::fs::remove_file(&path);
+        }
+    }
+    Ok(())
+}
+
 #[tauri::command]
 fn cancel_render(jobs: State<'_, Arc<JobHandles>>) -> Result<(), String> {
     let pid = {
@@ -645,6 +675,7 @@ pub fn run() {
             copy_scene_asset,
             write_plan_json,
             clear_scene_asset,
+            clear_tts_cache,
             run_dub_worker
         ])
         .run(tauri::generate_context!())

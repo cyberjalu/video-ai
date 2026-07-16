@@ -15,6 +15,7 @@ export function Card({
   return (
     <div
       className={cn(
+        "transition-[border-color,box-shadow,transform,background-color] duration-200",
         variants[variant],
         className,
       )}

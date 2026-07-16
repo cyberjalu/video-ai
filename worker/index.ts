@@ -591,6 +591,30 @@ async function findExistingVoiceover(projectDir: string): Promise<string | null>
   return null;
 }
 
+function voiceoverFingerprint(plan: VideoPlan): string {
+  return plan.scenes.map((s) => s.voiceover.trim()).join("\n");
+}
+
+async function voiceoverCacheMatchesPlan(projectDir: string, plan: VideoPlan): Promise<boolean> {
+  const fingerprintPath = path.join(projectDir, "tts", "voiceover.source.txt");
+  try {
+    const saved = await fs.readFile(fingerprintPath, "utf-8");
+    return saved === voiceoverFingerprint(plan);
+  } catch {
+    // Legacy caches without fingerprint: allow reuse (UI clears wavs on script edit).
+    return true;
+  }
+}
+
+async function writeVoiceoverFingerprint(projectDir: string, plan: VideoPlan) {
+  await ensureDir(path.join(projectDir, "tts"));
+  await fs.writeFile(
+    path.join(projectDir, "tts", "voiceover.source.txt"),
+    voiceoverFingerprint(plan),
+    "utf-8",
+  );
+}
+
 async function extractArticle(url: string, projectDir: string) {
   emit({ type: "step_start", step: "extract" });
 
@@ -1645,21 +1669,27 @@ async function prepareVoiceover(
   const audioPath = path.join(baseOut, "tts", "voiceover.wav");
 
   const existing = await findExistingVoiceover(baseOut);
-  if (existing && !args.audioPath) {
+  const cacheMatches = existing ? await voiceoverCacheMatchesPlan(baseOut, plan) : false;
+
+  if (existing && !args.audioPath && cacheMatches) {
     emit({ type: "log", step: "tts", message: `Reuse existing voiceover: ${existing}` });
     return { plan, fittedAudioPath: existing };
+  }
+
+  if (existing && !cacheMatches) {
+    emit({
+      type: "log",
+      step: "tts",
+      message: "Script voiceover changed; regenerating TTS instead of reusing cached wav.",
+    });
   }
 
   if (args.audioPath) {
     emit({ type: "log", step: "tts", message: "Chế độ Audio: Bỏ qua TTS, dùng file upload." });
     await ensureDir(path.join(baseOut, "tts"));
     await execFileP("ffmpeg", ["-y", "-i", args.audioPath, audioPathRaw]);
+    await writeVoiceoverFingerprint(baseOut, plan);
     return { plan, fittedAudioPath: audioPathRaw };
-  }
-
-  if (existing) {
-    emit({ type: "log", step: "tts", message: `Reuse existing voiceover: ${existing}` });
-    return { plan, fittedAudioPath: existing };
   }
 
   const ttsProvider =
@@ -1729,6 +1759,7 @@ async function prepareVoiceover(
     });
   }
 
+  await writeVoiceoverFingerprint(baseOut, nextPlan);
   return { plan: nextPlan, fittedAudioPath };
 }
 

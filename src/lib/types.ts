@@ -77,6 +77,8 @@ export type WorkerEvent =
 export type VideoPlan = {
   title: string;
   target_duration_sec: number;
+  /** Gemini TTS markdown prompt; cleared when voiceover is edited in the UI. */
+  audio_prompt?: string;
   scenes: Array<{
     id: string;
     role: string;

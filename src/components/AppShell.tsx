@@ -24,7 +24,7 @@ export function AppShell({
         <div className="relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden px-3 pb-3 pt-3">
           {/* Ambient glows */}
           <div className="pointer-events-none absolute left-[-5%] top-[-15%] h-[45%] w-[45%] rounded-full bg-cyan-500/[0.07] blur-[100px]" />
-          <div className="pointer-events-none absolute bottom-[-15%] right-[-5%] h-[45%] w-[45%] rounded-full bg-violet-500/[0.07] blur-[100px]" />
+          <div className="pointer-events-none absolute bottom-[-15%] right-[-5%] h-[45%] w-[45%] rounded-full bg-sky-500/[0.06] blur-[100px]" />
           <div className="pointer-events-none absolute left-[40%] top-[30%] h-[30%] w-[30%] rounded-full bg-blue-500/[0.04] blur-[80px]" />
 
           <div className="relative z-10 shrink-0 rounded-[22px] border border-white/[0.05] bg-white/[0.025] px-4 py-3 backdrop-blur-xl">
