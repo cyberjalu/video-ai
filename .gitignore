@@ -12,6 +12,8 @@ dist
 dist-ssr
 .next
 data/jobs/
+data/batches/
+data/trends-cache.json
 *.local
 
 # Render / media artifacts (never commit)
@@ -47,6 +49,7 @@ src/tailwind-generated.css
 # Secrets
 .env
 .env.*
+!.env.example
 *.pem
 *_API_KEY*
 

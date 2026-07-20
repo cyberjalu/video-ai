@@ -1,0 +1,22 @@
+name: Cleanup jobs
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - name: Reap stuck + expired jobs
+        run: npm run cleanup:jobs
+        env:
+          JOB_DATA_DIR: ${{ vars.JOB_DATA_DIR || './data/jobs' }}
+          JOB_TTL_HOURS: ${{ vars.JOB_TTL_HOURS || '72' }}

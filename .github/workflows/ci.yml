@@ -30,3 +30,14 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: check
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -t clipnews:${{ github.sha }} .
+      - name: Cleanup expired jobs (dry schedule hook)
+        run: echo "Schedule npm run cleanup:jobs on the host / cron"

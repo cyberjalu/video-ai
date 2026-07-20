@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { getActiveWorkerCount, getMaxConcurrentRenders } from "@/server/pipeline/worker-bridge";
 
 const execFileP = promisify(execFile);
 
@@ -8,6 +9,7 @@ async function checkBin(bin: string) {
   await execFileP(bin, ["-version"]);
 }
 
+/** Liveness — process is up */
 export async function GET() {
   const checks: Record<string, boolean> = {};
   for (const bin of ["ffmpeg", "ffprobe"]) {
@@ -28,5 +30,13 @@ export async function GET() {
     playwright = false;
   }
   const ok = Object.values(checks).every(Boolean) && playwright;
-  return NextResponse.json({ ok, checks: { ...checks, playwright } }, { status: ok ? 200 : 503 });
+  return NextResponse.json(
+    {
+      ok,
+      status: "live",
+      checks: { ...checks, playwright },
+      workers: { active: getActiveWorkerCount(), max: getMaxConcurrentRenders() },
+    },
+    { status: ok ? 200 : 503 },
+  );
 }

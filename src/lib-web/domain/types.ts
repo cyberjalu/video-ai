@@ -1,6 +1,6 @@
 export type RenderPreset = "deep_explainer" | "news_60_80" | "ultra_25_35" | "viral_30_45";
 export type LayoutMode = "tri" | "mono" | "dual";
-export type TemplateId = "NewsStoryV1" | "CorporateNewsV1" | "YouTubeStoryV1";
+export type TemplateId = "NewsStoryV1" | "CorporateNewsV1" | "YouTubeStoryV1" | "ViralNewsV1";
 
 export type RenderOptions = {
   preset: RenderPreset;
@@ -121,4 +121,8 @@ export type GenerationRequest = {
     gemini: string;
     pexels?: string;
   };
+  /** Injected viral brief text for worker plan prompts */
+  viralBriefPrompt?: string;
+  /** Skip QC auto-replan (prevents loops) */
+  skipAutoReplan?: boolean;
 };

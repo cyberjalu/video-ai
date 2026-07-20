@@ -2,21 +2,18 @@ import type { GenerationRequest, RenderOptions, RenderPreset, TemplateId } from 
 import { getTemplateOrThrow } from "@/templates/registry";
 import { appendEvent, jobDir, readJob, readPlan, updateJob, writePlan } from "@/server/jobs/store";
 import { publishJobEvent } from "@/server/sse";
-import { runWorkerProcess } from "./worker-bridge";
+import { log } from "@/server/logging";
+import { runWorkerProcess, cancelWorker } from "./worker-bridge";
+import { generateViralBrief, generateCaptionPack, runViralQc } from "@/server/viral";
 
-export { runWorkerProcess };
+export { runWorkerProcess, cancelWorker };
 
-/** @see worker/index.ts extractArticle — extracted in T016 */
+/** @see worker/index.ts — stage markers for future module extraction */
 export const PIPELINE_STAGE_EXTRACT = "extract" as const;
-/** @see worker/index.ts planVideoWithGemini — extracted in T017 */
 export const PIPELINE_STAGE_PLAN = "plan" as const;
-/** @see worker/index.ts fetchPexels — extracted in T018 */
 export const PIPELINE_STAGE_PEXELS = "pexels" as const;
-/** @see worker/index.ts geminiTtsToWav — extracted in T019 */
 export const PIPELINE_STAGE_TTS = "tts" as const;
-/** @see worker/index.ts renderRemotionVideo — extracted in T020 */
 export const PIPELINE_STAGE_RENDER = "render" as const;
-/** @see worker/index.ts qc — extracted in T021 */
 export const PIPELINE_STAGE_QC = "qc" as const;
 
 const running = new Set<string>();
@@ -38,13 +35,12 @@ function buildWorkerArgs(
     stage,
     outDir: jobDir(jobId),
     projectDir: jobDir(jobId),
-    geminiKey: request.keys.gemini,
-    pexelsKey: request.keys.pexels,
     preset: options.preset,
     template: options.template as TemplateId,
     layoutMode: options.layout_mode,
     enableCallouts: String(options.enable_callouts),
     enableProgress: String(options.enable_progress),
+    enableCutSfx: String(options.enable_cut_sfx ?? false),
     voice: options.voice ?? "Zephyr",
     contentModel: options.contentModel ?? "gemini-3.5-flash",
     audioModel: options.audioModel ?? "gemini-3.1-flash-tts-preview",
@@ -56,6 +52,7 @@ function buildWorkerArgs(
     args.script = request.input.script;
     args.platform = "youtube";
   }
+  if (request.viralBriefPrompt) args.viralBrief = request.viralBriefPrompt;
 
   return args;
 }
@@ -67,7 +64,11 @@ async function forwardEvents(jobId: string, event: import("@/lib/domain/types").
 
   if (event.type === "plan_ready" && "plan" in event && event.plan) {
     await writePlan(jobId, event.plan as import("@/lib/domain/types").VideoPlan);
-    await updateJob(jobId, { status: "awaiting_review", stage: "plan", plan: event.plan as import("@/lib/domain/types").VideoPlan });
+    await updateJob(jobId, {
+      status: "awaiting_review",
+      stage: "plan",
+      plan: event.plan as import("@/lib/domain/types").VideoPlan,
+    });
   }
   if (event.type === "step_done" && event.step === "plan" && "plan" in event && event.plan) {
     await writePlan(jobId, event.plan as import("@/lib/domain/types").VideoPlan);
@@ -92,21 +93,69 @@ export async function runPlanStage(jobId: string, request: GenerationRequest) {
   if (running.has(jobId)) return;
   running.add(jobId);
   await updateJob(jobId, { status: "planning", stage: "plan" });
+  log.info("plan_stage_start", { jobId, templateId: request.templateId });
+
   try {
-    await runWorkerProcess(buildWorkerArgs(jobId, "plan", request), (event) => {
-      void forwardEvents(jobId, event);
-    });
+    // Viral brief enrichment (Phase 2) — best-effort
+    try {
+      const brief = await generateViralBrief(request);
+      if (brief) {
+        request = { ...request, viralBriefPrompt: brief.enhancedPrompt };
+        await writeViralArtifact(jobId, "viral_brief.json", brief);
+      }
+    } catch (e) {
+      log.warn("viral_brief_failed", { jobId, error: e instanceof Error ? e.message : String(e) });
+    }
+
+    await runWorkerProcess(
+      jobId,
+      buildWorkerArgs(jobId, "plan", request),
+      { geminiKey: request.keys.gemini, pexelsKey: request.keys.pexels },
+      (event) => {
+        void forwardEvents(jobId, event);
+      },
+    );
+    let plan = await readPlan(jobId);
+    if (plan && !request.skipAutoReplan) {
+      const qc = runViralQc(plan);
+      await writeViralArtifact(jobId, "qc.json", qc);
+      if (!qc.pass && request.options.preset === "viral_30_45") {
+        log.info("qc_replan", { jobId, reasons: qc.reasons });
+        publishJobEvent(jobId, {
+          type: "log",
+          message: `QC soft-fail (${qc.reasons.join("; ")}) — re-planning once`,
+        });
+        running.delete(jobId);
+        await runPlanStage(jobId, {
+          ...request,
+          skipAutoReplan: true,
+          viralBriefPrompt:
+            (request.viralBriefPrompt ?? "") +
+            "\n\nFIX RETENTION: ensure 8-10 scenes, hook<=5s, mandatory re_hook mid-video, duration 30-45s.",
+        });
+        return;
+      }
+    }
+
+    if (plan) {
+      try {
+        const pack = await generateCaptionPack(request.keys.gemini, plan);
+        if (pack) await writeViralArtifact(jobId, "caption_pack.json", pack);
+      } catch (e) {
+        log.warn("caption_pack_failed", { jobId, error: e instanceof Error ? e.message : String(e) });
+      }
+    }
+
     const job = await readJob(jobId);
-    if (job && job.status === "planning") {
+    if (job && (job.status === "planning" || job.status === "queued")) {
       await updateJob(jobId, { status: "awaiting_review", stage: null });
     }
+    log.info("plan_stage_done", { jobId });
   } catch (e) {
-    await updateJob(jobId, {
-      status: "failed",
-      error: e instanceof Error ? e.message : String(e),
-      stage: null,
-    });
-    publishJobEvent(jobId, { type: "error", message: e instanceof Error ? e.message : String(e) });
+    const message = e instanceof Error ? e.message : String(e);
+    log.error("plan_stage_failed", { jobId, error: message });
+    await updateJob(jobId, { status: "failed", error: message, stage: null });
+    publishJobEvent(jobId, { type: "error", message });
   } finally {
     running.delete(jobId);
   }
@@ -116,23 +165,44 @@ export async function runRenderStage(jobId: string, request: GenerationRequest) 
   if (running.has(jobId)) return;
   running.add(jobId);
   await updateJob(jobId, { status: "rendering", stage: "render" });
+  log.info("render_stage_start", { jobId });
+
   try {
-    await runWorkerProcess(buildWorkerArgs(jobId, "render", request), (event) => {
-      void forwardEvents(jobId, event);
-    });
+    await runWorkerProcess(
+      jobId,
+      buildWorkerArgs(jobId, "render", request),
+      { geminiKey: request.keys.gemini, pexelsKey: request.keys.pexels },
+      (event) => {
+        void forwardEvents(jobId, event);
+      },
+    );
     const plan = await readPlan(jobId);
     const job = await readJob(jobId);
+    if (plan) {
+      const qc = runViralQc(plan);
+      await writeViralArtifact(jobId, "qc.json", qc);
+      publishJobEvent(jobId, {
+        type: "log",
+        message: `QC: ${qc.pass ? "pass" : "warn"} (${qc.score}) — ${qc.reasons.join("; ") || "ok"}`,
+      });
+    }
     if (job?.status === "rendering") {
       await updateJob(jobId, { status: "completed", stage: null, plan: plan ?? undefined });
     }
+    log.info("render_stage_done", { jobId });
   } catch (e) {
-    await updateJob(jobId, {
-      status: "failed",
-      error: e instanceof Error ? e.message : String(e),
-      stage: null,
-    });
-    publishJobEvent(jobId, { type: "error", message: e instanceof Error ? e.message : String(e) });
+    const message = e instanceof Error ? e.message : String(e);
+    log.error("render_stage_failed", { jobId, error: message });
+    await updateJob(jobId, { status: "failed", error: message, stage: null });
+    publishJobEvent(jobId, { type: "error", message });
   } finally {
     running.delete(jobId);
   }
+}
+
+async function writeViralArtifact(jobId: string, name: string, data: unknown) {
+  const fs = await import("node:fs/promises");
+  const path = await import("node:path");
+  const dir = jobDir(jobId);
+  await fs.writeFile(path.join(dir, name), JSON.stringify(data, null, 2));
 }

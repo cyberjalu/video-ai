@@ -1,19 +1,39 @@
 import { NextResponse } from "next/server";
 import path from "node:path";
 import { readJob, readPlan, saveSceneAsset, writePlan } from "@/server/jobs/store";
+import { requireJobToken } from "@/server/security/job-token";
+import { assertValidJobId, assertValidSceneId } from "@/server/security/ids";
 
 const MAX_IMAGE = 10 * 1024 * 1024;
 const MAX_VIDEO = 50 * 1024 * 1024;
 
 export async function POST(req: Request, ctx: { params: Promise<{ jobId: string }> }) {
-  const { jobId } = await ctx.params;
+  const { jobId: rawId } = await ctx.params;
+  let jobId: string;
+  try {
+    jobId = assertValidJobId(rawId);
+  } catch {
+    return NextResponse.json({ error: "Invalid job id" }, { status: 400 });
+  }
+
+  if (!requireJobToken(req, jobId)) {
+    return NextResponse.json({ error: "Missing or invalid job token" }, { status: 403 });
+  }
+
   const job = await readJob(jobId);
   if (!job) return NextResponse.json({ error: "Job not found" }, { status: 404 });
 
   const form = await req.formData();
-  const sceneId = String(form.get("sceneId") ?? "");
+  const sceneIdRaw = String(form.get("sceneId") ?? "");
+  let sceneId: string;
+  try {
+    sceneId = assertValidSceneId(sceneIdRaw);
+  } catch {
+    return NextResponse.json({ error: "Invalid sceneId" }, { status: 400 });
+  }
+
   const file = form.get("file");
-  if (!sceneId || !(file instanceof File)) {
+  if (!(file instanceof File)) {
     return NextResponse.json({ error: "sceneId and file required" }, { status: 400 });
   }
 
@@ -25,7 +45,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ jobId: string 
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const dest = await saveSceneAsset(jobId, sceneId, buffer, file.name);
-  const ext = path.extname(dest);
+  const ext = path.extname(dest).slice(1);
 
   const plan = await readPlan(jobId);
   if (!plan) return NextResponse.json({ error: "Plan not found" }, { status: 404 });
@@ -58,7 +78,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ jobId: string 
 
   return NextResponse.json({
     sceneId,
-    assetUrl: `/api/jobs/${jobId}/assets/${sceneId}/${ext.slice(1)}`,
+    assetUrl: `/api/jobs/${jobId}/assets/${sceneId}/${ext}`,
     plan: next,
   });
 }

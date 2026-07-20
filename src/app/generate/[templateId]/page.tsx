@@ -1,17 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { WebShell } from "@/components/WebShell";
 import { createJob } from "@/lib/api-client";
 import { DEFAULT_OPTIONS } from "@/lib/domain/types";
-import { loadSessionGeminiKey, loadSessionPexelsKey, pushRecentJobId } from "@/lib/session-keys";
+import {
+  loadSessionGeminiKey,
+  loadSessionPexelsKey,
+  loadRenderPrefs,
+  pushRecentJobId,
+} from "@/lib/session-keys";
 import { getTemplateOrThrow } from "@/templates/registry";
 
-export default function GeneratePage() {
+function GenerateForm() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const templateId = String(params?.templateId ?? "");
   const tpl = getTemplateOrThrow(templateId);
   const [mode, setMode] = useState<"url" | "prompt" | "script">(
@@ -22,6 +28,18 @@ export default function GeneratePage() {
   const [script, setScript] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const qPrompt = searchParams?.get("prompt");
+    const qUrl = searchParams?.get("url");
+    if (qUrl) {
+      setUrl(qUrl);
+      setMode("url");
+    } else if (qPrompt) {
+      setPrompt(qPrompt);
+      setMode("prompt");
+    }
+  }, [searchParams]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -34,6 +52,7 @@ export default function GeneratePage() {
 
     setBusy(true);
     try {
+      const prefs = loadRenderPrefs();
       const input =
         mode === "url"
           ? { mode: "url" as const, url }
@@ -48,7 +67,10 @@ export default function GeneratePage() {
           ...DEFAULT_OPTIONS,
           ...tpl.defaultOptions,
           template: tpl.compositionId,
-          preset: tpl.defaultPreset,
+          preset: prefs.preset ?? tpl.defaultPreset,
+          voice: prefs.voice ?? DEFAULT_OPTIONS.voice,
+          enable_cut_sfx: prefs.enable_cut_sfx ?? tpl.defaultOptions.enable_cut_sfx ?? false,
+          enable_progress: prefs.enable_progress ?? tpl.defaultOptions.enable_progress ?? true,
         },
         keys: { gemini, pexels: loadSessionPexelsKey() || undefined },
       });
@@ -104,13 +126,19 @@ export default function GeneratePage() {
             className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm"
           />
         ) : (
-          <textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            rows={5}
-            placeholder="Describe the video topic…"
-            className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm"
-          />
+          <div>
+            <textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              rows={5}
+              placeholder="Mô tả chủ đề… Có thể dán https://… — tool sẽ mở trang và screenshot đưa vào video."
+              className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm"
+            />
+            <p className="mt-1.5 text-[11px] text-zinc-500">
+              URL trong prompt (tối đa 3) sẽ được truy cập an toàn, chụp headline/đoạn liên quan, rồi gắn vào scene
+              screenshot. Tab URL = chỉ một trang nguồn (article mode).
+            </p>
+          </div>
         )}
 
         {error ? <p className="text-sm text-red-300">{error}</p> : null}
@@ -124,5 +152,13 @@ export default function GeneratePage() {
         </button>
       </form>
     </WebShell>
+  );
+}
+
+export default function GeneratePage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-zinc-400">Loading…</div>}>
+      <GenerateForm />
+    </Suspense>
   );
 }

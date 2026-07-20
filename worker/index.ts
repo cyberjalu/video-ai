@@ -10,6 +10,7 @@ import wav from "wav";
 import { bundle } from "@remotion/bundler";
 import { getCompositions, renderMedia } from "@remotion/renderer";
 import { execFile } from "node:child_process";
+import { extractHttpUrls } from "../src/lib-web/domain/urls.ts";
 
 const execFileP = (file: string, args: string[]) =>
   new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
@@ -135,6 +136,8 @@ const ArgsSchema = z.object({
   contentModel: z.string().optional(),
   audioModel: z.string().optional(),
   assetsDir: z.string().optional(),
+  viralBrief: z.string().optional(),
+  configStdin: z.boolean().optional(),
 });
 
 type SceneRole =
@@ -226,7 +229,33 @@ async function fileToDataUrl(filePath: string, mime: string) {
   return `data:${mime};base64,${b64}`;
 }
 
-function parseArgs(argv: string[]) {
+function parseBool(value: string | undefined) {
+  if (value == null) return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes", "y", "on"].includes(normalized)) return true;
+  if (["0", "false", "no", "n", "off"].includes(normalized)) return false;
+  return undefined;
+}
+
+async function readStdinSecrets(): Promise<{ geminiKey?: string; pexelsKey?: string; openaiKey?: string }> {
+  if (!process.stdin.readable || process.stdin.isTTY) return {};
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  if (!chunks.length) return {};
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString("utf-8")) as {
+      geminiKey?: string;
+      pexelsKey?: string;
+      openaiKey?: string;
+    };
+  } catch {
+    return {};
+  }
+}
+
+async function parseArgs(argv: string[]) {
   const out: Record<string, string> = {};
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
@@ -236,13 +265,9 @@ function parseArgs(argv: string[]) {
     out[key] = v;
     i++;
   }
-  const parseBool = (value: string | undefined) => {
-    if (value == null) return undefined;
-    const normalized = value.trim().toLowerCase();
-    if (["1", "true", "yes", "y", "on"].includes(normalized)) return true;
-    if (["0", "false", "no", "n", "off"].includes(normalized)) return false;
-    return undefined;
-  };
+
+  const useStdin = parseBool(out.configStdin);
+  const secrets = useStdin ? await readStdinSecrets() : {};
 
   return ArgsSchema.parse({
     url: out.url,
@@ -250,9 +275,10 @@ function parseArgs(argv: string[]) {
     audioPath: out.audioPath,
     script: out.script,
     platform: out.platform as any,
-    geminiKey: out.geminiKey ?? process.env.GEMINI_API_KEY,
-    openaiKey: out.openaiKey ?? process.env.OPENAI_API_KEY,
-    pexelsKey: out.pexelsKey ?? process.env.PEXELS_API_KEY,
+    // Prefer stdin secrets; never require CLI keys when configStdin=1
+    geminiKey: secrets.geminiKey ?? (useStdin ? undefined : out.geminiKey) ?? process.env.GEMINI_API_KEY,
+    openaiKey: secrets.openaiKey ?? (useStdin ? undefined : out.openaiKey) ?? process.env.OPENAI_API_KEY,
+    pexelsKey: secrets.pexelsKey ?? (useStdin ? undefined : out.pexelsKey) ?? process.env.PEXELS_API_KEY,
     planFile: out.planFile,
     projectDir: out.projectDir,
     stage: (out.stage as "plan" | "render" | "full" | undefined) ?? "full",
@@ -268,6 +294,8 @@ function parseArgs(argv: string[]) {
     contentModel: out.contentModel,
     audioModel: out.audioModel,
     assetsDir: out.assetsDir,
+    viralBrief: out.viralBrief,
+    configStdin: useStdin,
   });
 }
 
@@ -621,8 +649,46 @@ async function writeVoiceoverFingerprint(projectDir: string, plan: VideoPlan) {
   );
 }
 
+async function assertSafePublicUrl(raw: string) {
+  const { lookup } = await import("node:dns/promises");
+  const net = await import("node:net");
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error("Invalid URL");
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error("Only http(s) URLs are allowed");
+  }
+  const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  const blocked = new Set(["localhost", "metadata.google.internal", "169.254.169.254"]);
+  if (blocked.has(host)) throw new Error("URL host is not allowed");
+  const isPrivate = (ip: string) => {
+    if (net.isIP(ip) === 4) {
+      const [a, b] = ip.split(".").map(Number);
+      return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+    }
+    if (net.isIP(ip) === 6) {
+      const n = ip.toLowerCase();
+      return n === "::1" || n.startsWith("fc") || n.startsWith("fd") || n.startsWith("fe80");
+    }
+    return true;
+  };
+  if (net.isIP(host)) {
+    if (isPrivate(host)) throw new Error("Private IP addresses are not allowed");
+    return url;
+  }
+  const result = await lookup(host, { all: true });
+  if (!result.length || result.some((r) => isPrivate(r.address))) {
+    throw new Error("URL resolves to a private or blocked address");
+  }
+  return url;
+}
+
 async function extractArticle(url: string, projectDir: string) {
   emit({ type: "step_start", step: "extract" });
+  await assertSafePublicUrl(url);
 
   const fetchHtml = async () => {
     const res = await fetch(url, {
@@ -656,12 +722,28 @@ async function extractArticle(url: string, projectDir: string) {
 
   const page = await context.newPage();
 
-  // Nhiều site chặn headless browser (403). Ưu tiên fetch HTML trực tiếp, rồi setContent để chụp screenshot.
-  const fetched = await withRetry("Article HTML fetch", fetchHtml, 2);
-  await page.setContent(fetched.html, { waitUntil: "domcontentloaded", timeout: 120_000 });
-  await page.waitForSelector("h1", { timeout: 60_000, state: "attached" }).catch(() => {});
-  await page.waitForSelector("p", { timeout: 60_000, state: "attached" }).catch(() => {});
+  // Nhiều site chặn headless (403): ưu tiên fetch + setContent; SPA nghèo nội dung → fallback page.goto.
+  let usedGoto = false;
+  let html = "";
+  try {
+    const fetched = await withRetry("Article HTML fetch", fetchHtml, 2);
+    html = fetched.html;
+    await page.setContent(html, { waitUntil: "domcontentloaded", timeout: 120_000 });
+  } catch {
+    usedGoto = true;
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 90_000 });
+  }
+  await page.waitForSelector("h1", { timeout: 30_000, state: "attached" }).catch(() => {});
+  await page.waitForSelector("p", { timeout: 30_000, state: "attached" }).catch(() => {});
   await page.waitForTimeout(800);
+
+  const pProbe = await page.locator("article p, main p, body p").count().catch(() => 0);
+  if (!usedGoto && pProbe < 2) {
+    emit({ type: "log", step: "extract", message: "Ít paragraph sau setContent — thử page.goto cho SPA." });
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 90_000 }).catch(() => undefined);
+    await page.waitForTimeout(1200);
+    usedGoto = true;
+  }
 
   const cookieButtons = [
     "button:has-text('Accept')",
@@ -681,11 +763,14 @@ async function extractArticle(url: string, projectDir: string) {
     }
   }
 
-  const html = fetched.html;
+  if (!html || usedGoto) {
+    html = await page.content();
+  }
   const domForTitle = new JSDOM(html, { url });
   const title =
-    domForTitle.window.document.querySelector("h1")?.textContent?.trim() ??
-    domForTitle.window.document.querySelector("title")?.textContent?.trim() ??
+    (await page.locator("h1").first().innerText().catch(() => ""))?.trim() ||
+    domForTitle.window.document.querySelector("h1")?.textContent?.trim() ||
+    domForTitle.window.document.querySelector("title")?.textContent?.trim() ||
     "";
 
   const rawHtmlPath = path.join(projectDir, "article", "raw.html");
@@ -696,7 +781,7 @@ async function extractArticle(url: string, projectDir: string) {
   const reader = new Readability(dom.window.document);
   const article = reader.parse();
 
-  const text = (article?.textContent ?? "").trim();
+  const text = (article?.textContent ?? "").trim() || (await page.locator("body").innerText().catch(() => "")).slice(0, 20_000);
   const excerpt = (article?.excerpt ?? "").trim();
 
   const rootCandidates = ["article", "main", ".cntn-wrp.artl-cnt", ".cntn-wrp", "body"];
@@ -773,6 +858,66 @@ function pickScreenshotParagraphs(paragraphs: { id: string; index: number; root:
   };
 }
 
+/** Reject thin element crops / near-empty PNGs that look zoomed or black on 9:16. */
+async function pngLooksUsable(filePath: string): Promise<boolean> {
+  try {
+    const st = await fs.stat(filePath);
+    if (st.size < 12_000) return false;
+    const fh = await fs.open(filePath, "r");
+    const buf = Buffer.alloc(24);
+    await fh.read(buf, 0, 24, 0);
+    await fh.close();
+    if (buf[0] !== 0x89 || buf.toString("ascii", 1, 4) !== "PNG") return st.size >= 12_000;
+    const w = buf.readUInt32BE(16);
+    const h = buf.readUInt32BE(20);
+    if (w < 320 || h < 240) return false;
+    // Extreme wide strips (e.g. single <p> crops) cause cover-zoom artefacts.
+    if (h / w < 0.25) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function captureViewport(
+  page: import("playwright").Page,
+  filePath: string,
+): Promise<void> {
+  await page.screenshot({ path: filePath, fullPage: false, type: "png" });
+}
+
+/** Scroll target into view, then capture full viewport (readable page context). */
+async function captureViewportAround(
+  page: import("playwright").Page,
+  locator: import("playwright").Locator,
+  filePath: string,
+  fallbackPath?: string,
+): Promise<void> {
+  try {
+    await locator.first().scrollIntoViewIfNeeded({ timeout: 5_000 });
+    await page.evaluate(() => {
+      const nudge = Math.floor(window.innerHeight * 0.22);
+      window.scrollBy(0, -nudge);
+    });
+    await page.waitForTimeout(180);
+    await captureViewport(page, filePath);
+    if (await pngLooksUsable(filePath)) return;
+  } catch {
+    /* fall through */
+  }
+  if (fallbackPath) {
+    try {
+      await fs.copyFile(fallbackPath, filePath);
+      return;
+    } catch {
+      /* fall through */
+    }
+  }
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(120);
+  await captureViewport(page, filePath);
+}
+
 async function captureScreenshots(
   page: import("playwright").Page,
   projectDir: string,
@@ -784,7 +929,9 @@ async function captureScreenshots(
 
   if (paragraphs.length === 0) {
     const fallbackPath = path.join(outDir, "headline.png");
-    await page.screenshot({ path: fallbackPath });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(150);
+    await captureViewport(page, fallbackPath);
     const names = ["lead", "fact", "context", "impact", "close"] as const;
     const meta: Record<string, unknown> = {
       headline: { selector: "body", path: fallbackPath },
@@ -809,15 +956,25 @@ async function captureScreenshots(
   const meta: Record<string, unknown> = {};
 
   const headlinePath = path.join(outDir, "headline.png");
-  await page.locator(picks.headline).first().scrollIntoViewIfNeeded();
-  await page.locator(picks.headline).first().screenshot({ path: headlinePath });
+  // Prefer above-the-fold hero (full viewport) over a tiny heading element crop.
+  try {
+    const headlineLoc = page.locator(picks.headline).first();
+    if ((await headlineLoc.count()) > 0) {
+      await captureViewportAround(page, headlineLoc, headlinePath);
+    } else {
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await captureViewport(page, headlinePath);
+    }
+  } catch {
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await captureViewport(page, headlinePath);
+  }
   meta.headline = { selector: picks.headline, path: headlinePath };
 
   const shot = async (name: string, p: { id: string; index: number; root: string; text: string }) => {
     const filePath = path.join(outDir, `${name}.png`);
     const loc = page.locator(`${p.root} p`).nth(p.index);
-    await loc.scrollIntoViewIfNeeded();
-    await loc.screenshot({ path: filePath });
+    await captureViewportAround(page, loc, filePath, headlinePath);
     meta[name] = { ...p, path: filePath };
     return filePath;
   };
@@ -831,6 +988,50 @@ async function captureScreenshots(
   await writeJson(path.join(outDir, "screenshots_meta.json"), meta);
   emit({ type: "step_done", step: "screenshot", files: Object.keys(meta).length });
   return meta as Record<string, { path: string }>;
+}
+
+/** Extra URLs from a prompt: hero + headline shots on the same browser. */
+async function captureSiteHero(
+  browser: import("playwright").Browser,
+  url: string,
+  projectDir: string,
+  slotPrefix: string,
+): Promise<Record<string, { path: string }>> {
+  await assertSafePublicUrl(url);
+  emit({ type: "log", step: "screenshot", message: `Capturing extra site ${url}` });
+  const context =
+    browser.contexts()[0] ??
+    (await browser.newContext({
+      viewport: { width: 1280, height: 720 },
+      deviceScaleFactor: 2,
+    }));
+  const page = await context.newPage();
+  const outDir = path.join(projectDir, "screenshots");
+  await ensureDir(outDir);
+  try {
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 90_000 });
+    await page.waitForTimeout(1000);
+    const heroPath = path.join(outDir, `${slotPrefix}_hero.png`);
+    const headlinePath = path.join(outDir, `${slotPrefix}_headline.png`);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await captureViewport(page, heroPath);
+    try {
+      const h1 = page.locator("h1").first();
+      if ((await h1.count()) > 0) {
+        await captureViewportAround(page, h1, headlinePath, heroPath);
+      } else {
+        await fs.copyFile(heroPath, headlinePath);
+      }
+    } catch {
+      await fs.copyFile(heroPath, headlinePath);
+    }
+    return {
+      [slotPrefix]: { path: heroPath },
+      [`${slotPrefix}_headline`]: { path: headlinePath },
+    };
+  } finally {
+    await page.close().catch(() => undefined);
+  }
 }
 
 function getLayoutCycle(mode: LayoutMode): SceneLayout[] {
@@ -879,8 +1080,10 @@ function normalizePlan(plan: VideoPlan, prefs: RenderPrefs) {
     }
 
     if (layout === "screenshot" && !image_fit) {
+      // Web screenshots + product UI → contain (cover zooms thin crops). Photos can still set cover.
       const p = (scene.screenshot_path || scene.screenshot_file || "").toLowerCase();
-      image_fit = p.includes("openrouter") || p.includes("proof") || p.includes("contain") ? "contain" : "cover";
+      image_fit =
+        p.endsWith(".jpg") || p.endsWith(".jpeg") || p.includes("pexels") ? "cover" : "contain";
     }
 
     if (scene.role === "hook") {
@@ -918,12 +1121,50 @@ function normalizePlan(plan: VideoPlan, prefs: RenderPrefs) {
     };
   });
 
+  let scenes = normalizedScenes;
   let target_duration_sec = plan.target_duration_sec;
   if (prefs.preset === "viral_30_45") {
     target_duration_sec = Math.max(30, Math.min(45, target_duration_sec));
+    scenes = enforceViralSceneCount(scenes);
+    target_duration_sec = Math.max(
+      30,
+      Math.min(
+        45,
+        scenes.reduce((sum, s) => sum + s.duration_sec, 0),
+      ),
+    );
   }
 
-  return { ...plan, target_duration_sec, scenes: normalizedScenes };
+  return { ...plan, target_duration_sec, scenes };
+}
+
+/** Clamp viral plans to 8–10 scenes and ensure a mid-video re_hook. */
+function enforceViralSceneCount(scenes: VideoPlan["scenes"]): VideoPlan["scenes"] {
+  let next = [...scenes];
+  if (!next.some((s) => s.role === "re_hook") && next.length >= 3) {
+    const mid = Math.min(Math.max(2, Math.floor(next.length / 3)), next.length - 1);
+    next[mid] = { ...next[mid], role: "re_hook", interrupt_strength: "strong" };
+  }
+  while (next.length > 10) {
+    // Drop middle non-hook/non-takeaway scenes first
+    const idx = next.findIndex((s, i) => i > 0 && i < next.length - 1 && s.role !== "re_hook" && s.role !== "hook");
+    if (idx < 0) break;
+    next.splice(idx, 1);
+  }
+  while (next.length < 8) {
+    const n = next.length + 1;
+    next.push({
+      id: `s${n}`,
+      role: next.length === 3 ? "re_hook" : "context",
+      duration_sec: 4,
+      caption_lines: ["Key detail", "Stay with me"],
+      voiceover: "Here's another key detail you need to know.",
+      layout: "big_callout",
+      callouts: ["Key detail"],
+      interrupt_strength: next.length === 3 ? "strong" : "normal",
+    });
+  }
+  return next.map((s, i) => ({ ...s, id: s.id || `s${i + 1}` }));
 }
 
 async function resolvePlanAssets(plan: VideoPlan, assetsDir: string | undefined, projectDir: string): Promise<VideoPlan> {
@@ -977,7 +1218,9 @@ async function resolvePlanAssets(plan: VideoPlan, assetsDir: string | undefined,
       const lower = screenshot_path.toLowerCase();
       const image_fit =
         scene.image_fit ??
-        (lower.includes("openrouter") || lower.includes("proof") ? "contain" : "cover");
+        (lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.includes("pexels")
+          ? "cover"
+          : "contain");
       return {
         ...scene,
         screenshot_path,
@@ -1131,12 +1374,41 @@ async function planVideoWithGemini(articleText: string, title: string, geminiKey
   throw new Error(`Không tạo được video plan hợp lệ: ${lastError}`);
 }
 
-function buildPromptPlanPrompt(userPrompt: string, prefs: RenderPrefs) {
-  const arc = "4-6 scenes tập trung vào hook mạnh mẽ, diễn giải chi tiết và kết luận.";
-  const durationTarget = "Tổng duration mục tiêu 30-60 giây.";
+type PromptPageContext = {
+  urls: string[];
+  excerpts: string[];
+};
+
+function buildPromptPlanPrompt(
+  userPrompt: string,
+  prefs: RenderPrefs,
+  pageContext?: PromptPageContext,
+) {
+  const hasPages = Boolean(pageContext?.urls.length);
+  const arc =
+    prefs.preset === "viral_30_45"
+      ? "8-10 scenes theo arc: hook → why_matters → re_hook → what_happened → evidence → context → impact → takeaway (pacing nhanh, FYP)."
+      : "4-6 scenes tập trung vào hook mạnh mẽ, diễn giải chi tiết và kết luận.";
+  const durationTarget =
+    prefs.preset === "viral_30_45"
+      ? "Tổng duration mục tiêu 30-45 giây."
+      : "Tổng duration mục tiêu 30-60 giây.";
   const calloutRule = prefs.enableCallouts
     ? "- Mỗi scene phải có callouts 1-2 item ngắn (6-28 ký tự), và callouts phải xuất hiện trong voiceover."
     : "- Để callouts là mảng rỗng [].";
+  const layoutRule = hasPages
+    ? `- Đã chụp screenshot các trang nguồn. Ưu tiên layout "screenshot" cho hook/evidence/what_happened (ít nhất 2–3 scene). Scene còn lại dùng big_callout|stat|split|broll + pexels_query.`
+    : `- Layout MẶC ĐỊNH: "big_callout", "split", "stat", "bar_chart" hoặc "broll". ĐỪNG trả về "screenshot". Dùng "broll" cho ~30–50% cảnh. Mọi scene không phải big_callout phải có pexels_query.`;
+
+  const pageBlock =
+    hasPages && pageContext
+      ? `\n\nCác trang đã mở và chụp ảnh (dùng làm bằng chứng visual; không bịa số liệu ngoài nội dung):\n${pageContext.urls
+          .map(
+            (u, i) =>
+              `### ${u}\n${(pageContext.excerpts[i] ?? "").slice(0, 4000)}`,
+          )
+          .join("\n\n")}\n`
+      : "";
 
   return `Bạn là biên tập viên video short-form tiếng Việt (TikTok/Reels/Shorts).
 Mục tiêu: Tạo kịch bản video dựa trên yêu cầu của người dùng cho bất kỳ chủ đề tin tức/explainer nào, giữ retention cao, ngôn ngữ tự nhiên, không bịa.
@@ -1190,17 +1462,22 @@ Ràng buộc chung:
 - caption_lines là tóm tắt trực tiếp của voiceover.
 - voiceover mở đầu bằng câu diễn giải lại caption_lines.
 ${calloutRule}
-- Layout MẶC ĐỊNH bắt buộc là "big_callout", "split", "stat", "bar_chart" hoặc "broll". ĐỪNG trả về "screenshot". Dùng "broll" cho ~30–50% cảnh. Mọi scene không phải big_callout phải có pexels_query.
+${layoutRule}
 - Giọng văn: Kể chuyện hấp dẫn, cuốn hút, dứt khoát.
-
+${pageBlock}
 Yêu cầu/Ý tưởng của người dùng:
 "${userPrompt}"`;
 }
 
-async function planVideoFromPromptWithGemini(userPrompt: string, geminiKey: string, prefs: RenderPrefs) {
+async function planVideoFromPromptWithGemini(
+  userPrompt: string,
+  geminiKey: string,
+  prefs: RenderPrefs,
+  opts?: { pageContext?: PromptPageContext; hasScreenshots?: boolean },
+) {
   emit({ type: "step_start", step: "plan" });
   const ai = new GoogleGenAI({ apiKey: geminiKey });
-  const prompt = buildPromptPlanPrompt(userPrompt, prefs);
+  const prompt = buildPromptPlanPrompt(userPrompt, prefs, opts?.pageContext);
 
   let lastError = "";
   for (let attempt = 1; attempt <= 2; attempt++) {
@@ -1211,8 +1488,13 @@ async function planVideoFromPromptWithGemini(userPrompt: string, geminiKey: stri
 
     try {
       const parsed = parsePlanFromModelOutput(res.text ?? "");
-      // Force big_callout
-      parsed.scenes = parsed.scenes.map(s => ({ ...s, layout: s.layout === 'screenshot' ? 'big_callout' : s.layout }));
+      // Without page screenshots, strip screenshot layouts (Pexels/callout path).
+      if (!opts?.hasScreenshots) {
+        parsed.scenes = parsed.scenes.map((s) => ({
+          ...s,
+          layout: s.layout === "screenshot" ? "big_callout" : s.layout,
+        }));
+      }
       const plan = normalizePlan(parsed, prefs);
       emit({
         type: "step_done",
@@ -1585,12 +1867,12 @@ async function renderRemotionVideo(
           )
         : undefined;
       const broll_src = s.broll_path ? await fileToDataUrl(s.broll_path, "video/mp4") : undefined;
+      const lower = (shotPath || "").toLowerCase();
       const image_fit =
         s.image_fit ??
-        (shotPath &&
-        (shotPath.toLowerCase().includes("openrouter") || shotPath.toLowerCase().includes("proof"))
-          ? "contain"
-          : "cover");
+        (lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.includes("pexels")
+          ? "cover"
+          : "contain");
       return {
         ...s,
         screenshot_path: shotPath,
@@ -1721,19 +2003,59 @@ async function qc(projectDir: string, mp4Path: string) {
   return qcDir;
 }
 
-function assignScreenshotsToScenes(
+async function assignScreenshotsToScenes(
   plan: VideoPlan,
   screenshots: Record<string, { path: string }>,
-): VideoPlan {
-  const screenshotSlots = ["lead", "fact", "context", "impact", "close"] as const;
-  let screenshotIndex = 0;
+): Promise<VideoPlan> {
+  const preferredOrder = [
+    "headline",
+    "lead",
+    "fact",
+    "context",
+    "impact",
+    "close",
+    ...Object.keys(screenshots)
+      .filter((k) => k.startsWith("site_"))
+      .sort(),
+  ];
+  const candidateKeys = [
+    ...preferredOrder.filter((k) => screenshots[k]?.path),
+    ...Object.keys(screenshots).filter((k) => !preferredOrder.includes(k) && screenshots[k]?.path),
+  ];
+  const ordered: string[] = [];
+  for (const key of candidateKeys) {
+    const p = screenshots[key]?.path;
+    if (!p) continue;
+    if (await pngLooksUsable(p)) ordered.push(key);
+    else {
+      emit({
+        type: "log",
+        step: "screenshot",
+        message: `Skipping unusable screenshot slot "${key}" (${p})`,
+      });
+    }
+  }
+  if (!ordered.length) return plan;
+
+  let shotIndex = 0;
+  const rolesPreferShot = new Set(["evidence", "what_happened", "hook", "context", "re_hook"]);
 
   const scenes = plan.scenes.map((scene) => {
-    if (scene.layout !== "screenshot") return scene;
-    const slot = screenshotSlots[screenshotIndex % screenshotSlots.length];
-    screenshotIndex++;
-    const slotPath = screenshots[slot]?.path;
-    return slotPath ? { ...scene, screenshot_path: slotPath } : scene;
+    if (scene.screenshot_path || scene.broll_path) return scene;
+    const explicit = scene.layout === "screenshot";
+    const soft = rolesPreferShot.has(scene.role) && shotIndex < ordered.length;
+    if (!explicit && !soft) return scene;
+    if (shotIndex >= ordered.length) return scene;
+    const slotPath = screenshots[ordered[shotIndex]]?.path;
+    shotIndex += 1;
+    if (!slotPath) return scene;
+    return {
+      ...scene,
+      layout: "screenshot" as const,
+      screenshot_path: slotPath,
+      broll_path: undefined,
+      image_fit: scene.image_fit ?? "contain",
+    };
   });
 
   return { ...plan, scenes };
@@ -1867,11 +2189,15 @@ async function runRenderStage(
   next = await autoFillPexelsAssets(next, args.pexelsKey, baseOut, orientation);
   next = {
     ...next,
-    scenes: next.scenes.map((s) =>
-      s.layout === "screenshot" && s.screenshot_path && !s.image_fit
-        ? { ...s, image_fit: "cover" as const }
-        : s,
-    ),
+    scenes: next.scenes.map((s) => {
+      if (s.layout !== "screenshot" || !s.screenshot_path || s.image_fit) return s;
+      const lower = s.screenshot_path.toLowerCase();
+      const image_fit =
+        lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.includes("pexels")
+          ? ("cover" as const)
+          : ("contain" as const);
+      return { ...s, image_fit };
+    }),
   };
   emit({ type: "step_done", step: "fetch_broll" });
 
@@ -1890,7 +2216,12 @@ async function runRenderStage(
 }
 
 async function main() {
-  const args = parseArgs(process.argv);
+  const args = await parseArgs(process.argv);
+  if (args.viralBrief && args.prompt) {
+    args.prompt = `${args.viralBrief}\n\nUser topic: ${args.prompt}`;
+  } else if (args.viralBrief && !args.prompt && !args.url) {
+    (args as { prompt?: string }).prompt = args.viralBrief;
+  }
   const prefs = toRenderPrefs(args);
   const stage = args.stage ?? "full";
 
@@ -2003,7 +2334,17 @@ async function main() {
       const audioPathRaw = path.join(baseOut, "tts", "voiceover.raw.wav");
       await execFileP("ffmpeg", ["-y", "-i", args.audioPath, audioPathRaw]);
     } else if (args.prompt) {
-      emit({ type: "log", step: "config", message: "Chế độ Prompt: Bỏ qua extract/screenshot." });
+      const urlsInPrompt = extractHttpUrls(args.prompt, 3);
+      if (urlsInPrompt.length > 0) {
+        emit({
+          type: "log",
+          step: "config",
+          message: `Chế độ Prompt+URL: phát hiện ${urlsInPrompt.length} link — extract & screenshot.`,
+        });
+      } else {
+        emit({ type: "log", step: "config", message: "Chế độ Prompt: Bỏ qua extract/screenshot." });
+      }
+
       if (args.planFile) {
         plan = await loadPlanFromDisk(args.planFile, prefs);
         emit({
@@ -2015,7 +2356,51 @@ async function main() {
           plan,
         });
       } else if (args.geminiKey) {
-        plan = await planVideoFromPromptWithGemini(args.prompt, args.geminiKey, prefs);
+        let pageContext: PromptPageContext | undefined;
+        if (urlsInPrompt.length > 0) {
+          const pages: PromptPageContext = { urls: [], excerpts: [] };
+          const first = await extractArticle(urlsInPrompt[0], baseOut);
+          browser = first.browser;
+          screenshotsMeta = await captureScreenshots(
+            first.page,
+            baseOut,
+            first.articleJson.paragraphs,
+          );
+          pages.urls.push(urlsInPrompt[0]);
+          pages.excerpts.push(
+            first.articleJson.text || first.articleJson.title || urlsInPrompt[0],
+          );
+
+          for (let i = 1; i < urlsInPrompt.length; i++) {
+            try {
+              const extra = await captureSiteHero(browser, urlsInPrompt[i], baseOut, `site_${i}`);
+              Object.assign(screenshotsMeta, extra);
+              pages.urls.push(urlsInPrompt[i]);
+              pages.excerpts.push(`Landing/page capture for ${urlsInPrompt[i]}`);
+            } catch (e) {
+              emit({
+                type: "log",
+                step: "screenshot",
+                message: `Bỏ qua URL ${urlsInPrompt[i]}: ${e instanceof Error ? e.message : String(e)}`,
+              });
+            }
+          }
+          pageContext = pages;
+          await writeJson(path.join(baseOut, "screenshots", "screenshots_meta.json"), {
+            ...screenshotsMeta,
+            promptUrls: urlsInPrompt,
+          });
+        }
+
+        plan = await planVideoFromPromptWithGemini(args.prompt, args.geminiKey, prefs, {
+          pageContext,
+          hasScreenshots: Boolean(pageContext?.urls.length),
+        });
+        if (Object.keys(screenshotsMeta).length) {
+          plan = await assignScreenshotsToScenes(plan, screenshotsMeta);
+          const assigned = plan.scenes.filter((s) => s.screenshot_path).length;
+          emit({ type: "step_done", step: "assign_screenshots", assigned });
+        }
       } else {
         throw new Error("Chế độ Prompt hiện tại chỉ hỗ trợ Gemini. Vui lòng cung cấp GEMINI_API_KEY.");
       }
@@ -2043,7 +2428,7 @@ async function main() {
         plan = await planVideoWithOpenAI(sourceText, articleJson.title, args.openaiKey!, prefs);
       }
 
-      plan = assignScreenshotsToScenes(plan, screenshotsMeta);
+      plan = await assignScreenshotsToScenes(plan, screenshotsMeta);
       const assignedCount = plan.scenes.filter((s) => s.layout === "screenshot" && s.screenshot_path).length;
       emit({ type: "step_done", step: "assign_screenshots", assigned: assignedCount });
     } else {

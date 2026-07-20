@@ -2,9 +2,22 @@ import { NextResponse } from "next/server";
 import { readJob, readRequest } from "@/server/jobs/store";
 import { runRenderStage } from "@/server/pipeline";
 import type { GenerationRequest } from "@/lib/domain/types";
+import { requireJobToken } from "@/server/security/job-token";
+import { assertValidJobId } from "@/server/security/ids";
 
 export async function POST(req: Request, ctx: { params: Promise<{ jobId: string }> }) {
-  const { jobId } = await ctx.params;
+  const { jobId: rawId } = await ctx.params;
+  let jobId: string;
+  try {
+    jobId = assertValidJobId(rawId);
+  } catch {
+    return NextResponse.json({ error: "Invalid job id" }, { status: 400 });
+  }
+
+  if (!requireJobToken(req, jobId)) {
+    return NextResponse.json({ error: "Missing or invalid job token" }, { status: 403 });
+  }
+
   const job = await readJob(jobId);
   if (!job) return NextResponse.json({ error: "Job not found" }, { status: 404 });
   if (job.status !== "awaiting_review" && job.status !== "completed") {

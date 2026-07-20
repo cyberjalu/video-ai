@@ -1,16 +1,21 @@
 import fs from "node:fs/promises";
-import path from "node:path";
+import { assertValidJobId, assertValidSceneId, assertValidAssetExt, safeJoinUnder } from "@/server/security/ids";
 import { jobDir } from "@/server/jobs/store";
 
 export async function serveSceneAsset(jobId: string, sceneId: string, ext: string) {
-  const p = path.join(jobDir(jobId), "assets", `${sceneId}.${ext}`);
+  assertValidJobId(jobId);
+  assertValidSceneId(sceneId);
+  const cleanExt = assertValidAssetExt(ext);
+  const p = safeJoinUnder(jobDir(jobId), "assets", `${sceneId}.${cleanExt}`);
   try {
     const data = await fs.readFile(p);
-    const mime = ext.match(/^(mp4|webm|mov)$/i)
+    const mime = cleanExt.match(/^(mp4|webm|mov|mkv)$/i)
       ? "video/mp4"
-      : ext.match(/^png$/i)
+      : cleanExt.match(/^png$/i)
         ? "image/png"
-        : "image/jpeg";
+        : cleanExt.match(/^gif$/i)
+          ? "image/gif"
+          : "image/jpeg";
     return new Response(data, { headers: { "Content-Type": mime } });
   } catch {
     return new Response("Not found", { status: 404 });

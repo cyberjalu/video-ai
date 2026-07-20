@@ -209,7 +209,7 @@ export const ScreenshotCard: React.FC<{
   durationInFrames?: number;
   imageFit?: "cover" | "contain";
   theme?: SceneVisualTheme;
-}> = ({ src, frame, height, durationInFrames = 90, imageFit = "cover", theme = "neon" }) => {
+}> = ({ src, frame, height, durationInFrames = 90, imageFit = "contain", theme = "neon" }) => {
   if (!src) return null;
   const t = THEMES[theme];
   const intro = interpolate(frame, [0, 16], [0, 1], {
@@ -220,10 +220,11 @@ export const ScreenshotCard: React.FC<{
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  const scale = interpolate(ken, [0, 1], [1.0, 1.08]);
-  const translateY = interpolate(ken, [0, 1], [0, -18]);
-  const opacity = interpolate(intro, [0, 0.25, 1], [0, 1, 1]);
   const fit = imageFit === "contain" ? "contain" : "cover";
+  // Mild motion for contain so page screenshots stay readable; stronger Ken Burns only for cover.
+  const scale = interpolate(ken, [0, 1], fit === "contain" ? [1.0, 1.02] : [1.0, 1.08]);
+  const translateY = interpolate(ken, [0, 1], fit === "contain" ? [0, -6] : [0, -18]);
+  const opacity = interpolate(intro, [0, 0.25, 1], [0, 1, 1]);
 
   return (
     <div
@@ -336,7 +337,10 @@ export const BigCalloutCard: React.FC<{
         maxWidth: 920,
         borderRadius: 20,
         border: `1px solid ${t.border}`,
-        background: t.panel,
+        background:
+          theme === "neon"
+            ? "linear-gradient(145deg, rgba(12,48,72,0.92) 0%, rgba(48,22,78,0.9) 100%)"
+            : t.panel,
         padding: "36px 30px",
         boxShadow: t.glow,
         transform: `scale(${scale})`,
@@ -366,7 +370,7 @@ export const SplitCard: React.FC<{
   height: number;
   imageFit?: "cover" | "contain";
   theme?: SceneVisualTheme;
-}> = ({ screenshotSrc, calloutText, captionLines = [], frame, height, imageFit = "cover", theme = "neon" }) => {
+}> = ({ screenshotSrc, calloutText, captionLines = [], frame, height, imageFit = "contain", theme = "neon" }) => {
   const t = THEMES[theme];
   const enter = interpolate(frame, [0, 12], [0, 1], {
     extrapolateLeft: "clamp",
@@ -485,10 +489,18 @@ export const SceneVisual: React.FC<{
     return <BarChartCard chart={chart} frame={frame} height={height} theme={theme} />;
   }
   if (layout === "big_callout") {
-    return <BigCalloutCard text={calloutText || ""} frame={frame} theme={theme} />;
+    const text =
+      calloutText || captionLines?.[0] || captionLines?.join(" · ") || "Key point";
+    return <BigCalloutCard text={text} frame={frame} theme={theme} />;
   }
   if (layout === "broll") {
     return <BrollCard brollSrc={brollSrc} height={height} theme={theme} />;
+  }
+  // Missing/failed screenshot would otherwise leave a blank (near-black) media slot.
+  if (!screenshotSrc) {
+    const text =
+      calloutText || captionLines?.[0] || captionLines?.join(" · ") || "Key point";
+    return <BigCalloutCard text={text} frame={frame} theme={theme} />;
   }
   return (
     <ScreenshotCard

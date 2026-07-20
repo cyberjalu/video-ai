@@ -2,6 +2,14 @@ const GEMINI_KEY = "clipnews.gemini";
 const PEXELS_KEY = "clipnews.pexels";
 const REMEMBER_KEY = "clipnews.rememberKeys";
 const RECENT_JOBS_KEY = "clipnews.recentJobIds";
+const RENDER_PREFS_KEY = "clipnews.renderPrefs";
+
+export type SessionRenderPrefs = {
+  preset?: "deep_explainer" | "news_60_80" | "ultra_25_35" | "viral_30_45";
+  voice?: string;
+  enable_cut_sfx?: boolean;
+  enable_progress?: boolean;
+};
 
 function useRemembered() {
   if (typeof window === "undefined") return false;
@@ -44,6 +52,21 @@ export function saveSessionKeys(gemini: string, pexels?: string, remember?: bool
   }
 }
 
+export function loadRenderPrefs(): SessionRenderPrefs {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(RENDER_PREFS_KEY);
+    return raw ? (JSON.parse(raw) as SessionRenderPrefs) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveRenderPrefs(prefs: SessionRenderPrefs) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(RENDER_PREFS_KEY, JSON.stringify(prefs));
+}
+
 export function pushRecentJobId(jobId: string) {
   if (typeof window === "undefined") return;
   const prev = loadRecentJobIds().filter((id) => id !== jobId);
@@ -56,6 +79,29 @@ export function loadRecentJobIds(): string[] {
   try {
     const raw = sessionStorage.getItem(RECENT_JOBS_KEY);
     return raw ? (JSON.parse(raw) as string[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function pushRecentBatchId(batchId: string) {
+  if (typeof window === "undefined") return;
+  const key = "clipnews.recentBatchIds";
+  try {
+    const prev = JSON.parse(sessionStorage.getItem(key) ?? "[]") as string[];
+    sessionStorage.setItem(
+      key,
+      JSON.stringify([batchId, ...prev.filter((id) => id !== batchId)].slice(0, 10)),
+    );
+  } catch {
+    sessionStorage.setItem(key, JSON.stringify([batchId]));
+  }
+}
+
+export function loadRecentBatchIds(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(sessionStorage.getItem("clipnews.recentBatchIds") ?? "[]") as string[];
   } catch {
     return [];
   }

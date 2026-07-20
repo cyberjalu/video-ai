@@ -1,4 +1,5 @@
 import type { WorkerEvent } from "@/lib/domain/types";
+import { readEvents } from "@/server/jobs/store";
 
 type Listener = (event: WorkerEvent) => void;
 
@@ -33,14 +34,30 @@ export function createSseStream(jobId: string, signal?: AbortSignal): ReadableSt
   return new ReadableStream({
     start(controller) {
       const send = (event: WorkerEvent) => {
-        controller.enqueue(encoder.encode(formatSseData(event)));
+        try {
+          controller.enqueue(encoder.encode(formatSseData(event)));
+        } catch {
+          /* closed */
+        }
       };
-      const unsub = subscribeJobEvents(jobId, send);
-      controller.enqueue(encoder.encode(`: connected job=${jobId}\n\n`));
+
+      let unsub = () => {};
+      void (async () => {
+        controller.enqueue(encoder.encode(`: connected job=${jobId}\n\n`));
+        const history = await readEvents(jobId);
+        for (const ev of history) {
+          send(ev as WorkerEvent);
+        }
+        unsub = subscribeJobEvents(jobId, send);
+      })();
 
       signal?.addEventListener("abort", () => {
         unsub();
-        controller.close();
+        try {
+          controller.close();
+        } catch {
+          /* already closed */
+        }
       });
     },
     cancel() {

@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import type { GenerationRequest, RenderJob, VideoPlan } from "@/lib/domain/types";
+import { assertValidJobId, assertValidSceneId, assertValidAssetExt, safeJoinUnder } from "@/server/security/ids";
 
 const DEFAULT_DATA_DIR = path.join(process.cwd(), "data", "jobs");
 const DEFAULT_TTL_HOURS = 72;
@@ -16,6 +17,7 @@ function ttlHours() {
 }
 
 export function jobDir(jobId: string) {
+  assertValidJobId(jobId);
   return path.join(dataRoot(), jobId);
 }
 
@@ -43,13 +45,14 @@ export async function createJob(templateId: string, request: GenerationRequest):
   };
 
   await fs.writeFile(path.join(dir, "meta.json"), JSON.stringify(job, null, 2));
-  const { keys: _keys, ...requestWithoutKeys } = request;
+  const { keys: _keys, viralBriefPrompt: _v, skipAutoReplan: _s, ...requestWithoutKeys } = request;
   await fs.writeFile(path.join(dir, "request.json"), JSON.stringify(requestWithoutKeys, null, 2));
   return job;
 }
 
 export async function readJob(jobId: string): Promise<RenderJob | null> {
   try {
+    assertValidJobId(jobId);
     const raw = await fs.readFile(path.join(jobDir(jobId), "meta.json"), "utf-8");
     const job = JSON.parse(raw) as RenderJob;
     if (new Date(job.expiresAt) < new Date()) return null;
@@ -95,6 +98,19 @@ export async function appendEvent(jobId: string, event: unknown) {
   await fs.appendFile(path.join(jobDir(jobId), "events.ndjson"), `${JSON.stringify(event)}\n`);
 }
 
+export async function readEvents(jobId: string): Promise<unknown[]> {
+  try {
+    const raw = await fs.readFile(path.join(jobDir(jobId), "events.ndjson"), "utf-8");
+    return raw
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .map((l) => JSON.parse(l) as unknown);
+  } catch {
+    return [];
+  }
+}
+
 export async function clearTtsCache(jobId: string) {
   const ttsDir = path.join(jobDir(jobId), "tts");
   try {
@@ -111,15 +127,16 @@ export async function saveSceneAsset(
   buffer: Buffer,
   filename: string,
 ): Promise<string> {
-  const ext = path.extname(filename) || ".bin";
-  const dest = path.join(jobDir(jobId), "assets", `${sceneId}${ext}`);
+  assertValidSceneId(sceneId);
+  const ext = assertValidAssetExt(path.extname(filename) || ".bin");
+  const dest = safeJoinUnder(jobDir(jobId), "assets", `${sceneId}.${ext}`);
   await ensureDir(path.dirname(dest));
   await fs.writeFile(dest, buffer);
   return dest;
 }
 
 export function assetUrl(jobId: string, sceneId: string, ext: string) {
-  return `/api/jobs/${jobId}/assets/${sceneId}${ext}`;
+  return `/api/jobs/${jobId}/assets/${sceneId}/${ext.replace(/^\./, "")}`;
 }
 
 export async function resolveMp4Path(jobId: string): Promise<string | null> {
@@ -136,4 +153,52 @@ export async function resolveMp4Path(jobId: string): Promise<string | null> {
     }
   }
   return null;
+}
+
+export async function readJsonArtifact<T>(jobId: string, name: string): Promise<T | null> {
+  try {
+    const raw = await fs.readFile(path.join(jobDir(jobId), name), "utf-8");
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
+/** Mark jobs stuck in planning/rendering past timeout as failed. */
+export async function reapStuckJobs(): Promise<number> {
+  const planTimeout = Number(process.env.WORKER_PLAN_TIMEOUT_MS ?? 3 * 60_000);
+  const renderTimeout = Number(process.env.WORKER_RENDER_TIMEOUT_MS ?? 10 * 60_000);
+  const root = dataRoot();
+  let reaped = 0;
+  try {
+    const entries = await fs.readdir(root, { withFileTypes: true });
+    const now = Date.now();
+    for (const ent of entries) {
+      if (!ent.isDirectory()) continue;
+      try {
+        assertValidJobId(ent.name);
+        const raw = await fs.readFile(path.join(root, ent.name, "meta.json"), "utf-8");
+        const job = JSON.parse(raw) as RenderJob;
+        if (job.status !== "planning" && job.status !== "rendering") continue;
+        const started = new Date(job.createdAt).getTime();
+        const limit = job.status === "planning" ? planTimeout : renderTimeout;
+        // Use updated meta mtime as activity proxy
+        const st = await fs.stat(path.join(root, ent.name, "meta.json"));
+        const last = Math.max(started, st.mtimeMs);
+        if (now - last > limit) {
+          job.status = "failed";
+          job.error = `Timed out while ${job.status === "failed" ? "running" : job.stage ?? "processing"}`;
+          job.stage = null;
+          job.error = `Stuck job reaped after ${Math.round(limit / 1000)}s`;
+          await fs.writeFile(path.join(root, ent.name, "meta.json"), JSON.stringify(job, null, 2));
+          reaped += 1;
+        }
+      } catch {
+        /* skip */
+      }
+    }
+  } catch {
+    /* missing root */
+  }
+  return reaped;
 }

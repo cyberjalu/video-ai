@@ -98,3 +98,33 @@ export function clampHookDuration(durationSec: number) {
 export function clampViralTargetDuration(durationSec: number) {
   return Math.max(30, Math.min(45, Math.round(durationSec)));
 }
+
+/** Ensure viral plans have 8–10 scenes and a mid-video re_hook. */
+export function enforceViralSceneCount(scenes: Scene[]): Scene[] {
+  let next = [...scenes];
+  if (!next.some((s) => s.role === "re_hook") && next.length >= 3) {
+    const mid = Math.min(Math.max(2, Math.floor(next.length / 3)), next.length - 1);
+    next[mid] = { ...next[mid], role: "re_hook", interrupt_strength: "strong" };
+  }
+  while (next.length > 10) {
+    const idx = next.findIndex(
+      (s, i) => i > 0 && i < next.length - 1 && s.role !== "re_hook" && s.role !== "hook",
+    );
+    if (idx < 0) break;
+    next.splice(idx, 1);
+  }
+  while (next.length < 8) {
+    const n = next.length + 1;
+    next.push({
+      id: `s${n}`,
+      role: next.length === 3 ? "re_hook" : "context",
+      duration_sec: 4,
+      caption_lines: ["Key detail", "Stay with me"],
+      voiceover: "Here's another key detail you need to know.",
+      layout: "big_callout",
+      callouts: ["Key detail"],
+      interrupt_strength: next.length === 3 ? "strong" : "normal",
+    });
+  }
+  return next.map((s, i) => ({ ...s, id: s.id || `s${i + 1}` }));
+}

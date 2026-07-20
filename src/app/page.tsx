@@ -8,28 +8,40 @@ export default function HomePage() {
   return (
     <WebShell
       header={
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="eyebrow-label">ClipNews Web</div>
             <h1 className="text-2xl font-semibold text-zinc-100" data-display="true">
               Free AI short-form videos
             </h1>
             <p className="mt-1 text-sm text-zinc-400">
-              Pick a template, paste a URL or prompt, get a video. No account required.
+              Discover trends, batch-generate viral TikToks, publish when ready. BYOK — no account.
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Link
-              href="/templates"
+              href="/discover"
               className="rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-sm font-semibold text-cyan-100"
             >
-              Browse templates
+              Discover
+            </Link>
+            <Link
+              href="/batch"
+              className="rounded-xl border border-white/10 px-4 py-2 text-sm text-zinc-300"
+            >
+              Batch
+            </Link>
+            <Link
+              href="/templates"
+              className="rounded-xl border border-white/10 px-4 py-2 text-sm text-zinc-300"
+            >
+              Templates
             </Link>
             <Link
               href="/settings"
               className="rounded-xl border border-white/10 px-4 py-2 text-sm text-zinc-300"
             >
-              API keys
+              Settings
             </Link>
           </div>
         </div>

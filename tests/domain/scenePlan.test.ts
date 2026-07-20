@@ -8,6 +8,7 @@ import {
   clampSceneDuration,
   clampViralTargetDuration,
   createBlankScene,
+  enforceViralSceneCount,
   isViralAccentRole,
   nextSceneId,
   sumDurations,
@@ -74,5 +75,35 @@ describe("scenePlan helpers", () => {
     expect(isViralAccentRole("hook")).toBe(true);
     expect(isViralAccentRole("re_hook")).toBe(true);
     expect(isViralAccentRole("context")).toBe(false);
+  });
+
+  it("enforces 8–10 scenes and inserts re_hook for viral plans", () => {
+    const short = [
+      {
+        id: "s1",
+        role: "hook",
+        duration_sec: 4,
+        caption_lines: ["A"],
+        voiceover: "a",
+      },
+      {
+        id: "s2",
+        role: "what_happened",
+        duration_sec: 4,
+        caption_lines: ["B"],
+        voiceover: "b",
+      },
+      {
+        id: "s3",
+        role: "takeaway",
+        duration_sec: 4,
+        caption_lines: ["C"],
+        voiceover: "c",
+      },
+    ];
+    const next = enforceViralSceneCount(short);
+    expect(next.length).toBeGreaterThanOrEqual(8);
+    expect(next.length).toBeLessThanOrEqual(10);
+    expect(next.some((s) => s.role === "re_hook")).toBe(true);
   });
 });
