@@ -10,6 +10,8 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+.next
+data/jobs/
 *.local
 
 # Render / media artifacts (never commit)

@@ -6,15 +6,15 @@
   "license": "MIT",
   "scripts": {
     "generate:css": "node generate-tailwind.cjs",
-    "dev": "vite",
-    "build": "node generate-tailwind.cjs && tsc && vite build",
+    "dev": "next dev",
+    "build": "node generate-tailwind.cjs && next build",
+    "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "preview": "vite preview",
-    "tauri": "tauri",
     "worker:render": "tsx ./worker/index.ts",
-    "render:sample": "tsx ./worker/index.ts --url \"https://www.bbc.com/news\""
+    "render:sample": "tsx ./worker/index.ts --url \"https://www.bbc.com/news\"",
+    "cleanup:jobs": "tsx ./scripts/cleanup-jobs.ts"
   },
   "dependencies": {
     "@fontsource/montserrat": "^5.2.8",
@@ -23,13 +23,11 @@
     "@mozilla/readability": "^0.5.0",
     "@remotion/bundler": "^4.0.287",
     "@remotion/renderer": "^4.0.287",
-    "@tauri-apps/api": "^2",
-    "@tauri-apps/plugin-dialog": "^2.7.1",
-    "@tauri-apps/plugin-opener": "^2",
     "clsx": "^2.1.1",
     "framer-motion": "^12.38.0",
     "jsdom": "^26.1.0",
     "lucide-react": "^1.14.0",
+    "next": "^15.5.20",
     "playwright": "^1.53.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
@@ -39,17 +37,14 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2",
     "@types/node": "^24.0.0",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
-    "@vitejs/plugin-react": "^4.6.0",
     "autoprefixer": "^10.5.0",
     "postcss": "^8.5.14",
     "tailwindcss": "^4.3.0",
     "tsx": "^4.20.5",
     "typescript": "~5.8.3",
-    "vite": "^7.0.4",
     "vitest": "^3.2.7"
   }
 }

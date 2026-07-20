@@ -125,11 +125,12 @@ const ArgsSchema = z.object({
   stage: z.enum(["plan", "render", "full"]).optional(),
   tts: z.enum(["gemini", "openai", "macos"]).optional(),
   outDir: z.string().optional(),
-  preset: z.enum(["deep_explainer", "news_60_80", "ultra_25_35"]).optional(),
+  preset: z.enum(["deep_explainer", "news_60_80", "ultra_25_35", "viral_30_45"]).optional(),
   template: z.string().optional(),
   layoutMode: z.enum(["tri", "dual", "mono"]).optional(),
   enableCallouts: z.boolean().optional(),
   enableProgress: z.boolean().optional(),
+  enableCutSfx: z.boolean().optional(),
   voice: z.string().optional(),
   contentModel: z.string().optional(),
   audioModel: z.string().optional(),
@@ -147,7 +148,7 @@ type SceneRole =
   | "takeaway";
 
 type SceneLayout = "screenshot" | "big_callout" | "split" | "broll" | "stat" | "bar_chart";
-type RenderPreset = "deep_explainer" | "news_60_80" | "ultra_25_35";
+type RenderPreset = "deep_explainer" | "news_60_80" | "ultra_25_35" | "viral_30_45";
 type LayoutMode = "tri" | "dual" | "mono";
 
 type RenderPrefs = {
@@ -156,6 +157,7 @@ type RenderPrefs = {
   layoutMode: LayoutMode;
   enableCallouts: boolean;
   enableProgress: boolean;
+  enableCutSfx: boolean;
   contentModel?: string;
   audioModel?: string;
 };
@@ -206,6 +208,8 @@ const VideoPlanSchema = z.object({
         pexels_credit: z.string().optional(),
         pexels_url: z.string().optional(),
         broll_path: z.string().optional(),
+        caption_emphasis: z.array(z.string()).max(3).optional(),
+        interrupt_strength: z.enum(["normal", "strong"]).optional(),
         stat: StatSchema.optional(),
         chart: ChartSchema.optional(),
       }),
@@ -259,6 +263,7 @@ function parseArgs(argv: string[]) {
     layoutMode: out.layoutMode as LayoutMode | undefined,
     enableCallouts: parseBool(out.enableCallouts),
     enableProgress: parseBool(out.enableProgress),
+    enableCutSfx: parseBool(out.enableCutSfx),
     voice: out.voice,
     contentModel: out.contentModel,
     audioModel: out.audioModel,
@@ -273,6 +278,7 @@ function toRenderPrefs(args: z.infer<typeof ArgsSchema>): RenderPrefs {
     layoutMode: args.layoutMode ?? "tri",
     enableCallouts: args.enableCallouts ?? true,
     enableProgress: args.enableProgress ?? true,
+    enableCutSfx: args.enableCutSfx ?? false,
     contentModel: args.contentModel,
     audioModel: args.audioModel,
   };
@@ -846,6 +852,12 @@ function normalizePlan(plan: VideoPlan, prefs: RenderPrefs) {
     let stat = scene.stat;
     let chart = scene.chart;
     let image_fit = scene.image_fit;
+    let duration_sec = scene.duration_sec;
+    let interrupt_strength = scene.interrupt_strength;
+
+    if (scene.role === "re_hook") {
+      interrupt_strength = "strong";
+    }
 
     if (layout === "stat" && !stat?.value) {
       const raw = scene.callouts?.[0]?.trim() || scene.caption_lines[0]?.trim();
@@ -871,6 +883,25 @@ function normalizePlan(plan: VideoPlan, prefs: RenderPrefs) {
       image_fit = p.includes("openrouter") || p.includes("proof") || p.includes("contain") ? "contain" : "cover";
     }
 
+    if (scene.role === "hook") {
+      duration_sec = Math.min(duration_sec, 5);
+      if (
+        layout === "screenshot" &&
+        !scene.screenshot_path &&
+        !scene.screenshot_file &&
+        !scene.broll_path
+      ) {
+        layout = stat?.value ? "stat" : "big_callout";
+      }
+    }
+
+    if (prefs.preset === "ultra_25_35" && scene.role === "hook") {
+      duration_sec = Math.min(duration_sec, 5);
+      if (layout === "screenshot" && !scene.screenshot_path && !scene.broll_path) {
+        layout = stat?.value ? "stat" : "big_callout";
+      }
+    }
+
     const callouts = prefs.enableCallouts
       ? (scene.callouts?.filter((x) => x.trim().length > 0).slice(0, 2) ?? fallbackCallouts(scene.caption_lines))
       : [];
@@ -881,9 +912,18 @@ function normalizePlan(plan: VideoPlan, prefs: RenderPrefs) {
       stat,
       chart,
       image_fit,
+      duration_sec,
+      interrupt_strength,
+      caption_emphasis: scene.caption_emphasis?.filter(Boolean).slice(0, 3),
     };
   });
-  return { ...plan, scenes: normalizedScenes };
+
+  let target_duration_sec = plan.target_duration_sec;
+  if (prefs.preset === "viral_30_45") {
+    target_duration_sec = Math.max(30, Math.min(45, target_duration_sec));
+  }
+
+  return { ...plan, target_duration_sec, scenes: normalizedScenes };
 }
 
 async function resolvePlanAssets(plan: VideoPlan, assetsDir: string | undefined, projectDir: string): Promise<VideoPlan> {
@@ -958,17 +998,23 @@ function buildPlanPrompt(articleText: string, title: string, prefs: RenderPrefs)
       ? "10-12 scenes theo arc: hook → why_matters → re_hook → what_happened → evidence → context → impact → takeaway."
       : prefs.preset === "ultra_25_35"
         ? "4-5 scenes theo arc: hook → what_happened → impact → takeaway."
-        : "7 scenes theo arc: hook → why_matters → what_happened → evidence → context → impact → takeaway.";
+        : prefs.preset === "viral_30_45"
+          ? "8-10 scenes theo arc: hook → why_matters → re_hook → what_happened → evidence → context → impact → takeaway (pacing nhanh, FYP)."
+          : "7 scenes theo arc: hook → why_matters → what_happened → evidence → context → impact → takeaway.";
   const durationTarget =
     prefs.preset === "deep_explainer"
       ? "Tổng duration mục tiêu 90-110 giây (chấp nhận 80-120 giây)."
       : prefs.preset === "ultra_25_35"
         ? "Tổng duration 25-35 giây."
-        : "Tổng duration 60-80 giây.";
+        : prefs.preset === "viral_30_45"
+          ? "Tổng duration 30-45 giây."
+          : "Tổng duration 60-80 giây.";
   const secondHookRule =
     prefs.preset === "deep_explainer"
       ? "- Bắt buộc có 1 re-hook quanh giây 12-15 (scene 3) để giữ retention."
-      : "";
+      : prefs.preset === "viral_30_45"
+        ? "- Bắt buộc có 1 re-hook quanh giây 8-12 (scene 3 hoặc 4) để giữ retention."
+        : "";
   const calloutRule = prefs.enableCallouts
     ? "- Mỗi scene phải có callouts 1-2 item ngắn (6-28 ký tự), và callouts phải xuất hiện trong voiceover."
     : "- Để callouts là mảng rỗng [].";
@@ -1469,6 +1515,43 @@ async function fitAudioToTargetDuration(
   return { path: outPath, inDur, target, factor, action: "pad_silence", requiresRewrite: false };
 }
 
+function sceneCutTimesSec(scenes: VideoPlan["scenes"]): number[] {
+  let t = 0;
+  const cuts: number[] = [];
+  for (let i = 0; i < scenes.length - 1; i++) {
+    t += Math.max(3, Math.min(12, scenes[i].duration_sec || 5));
+    cuts.push(t);
+  }
+  return cuts;
+}
+
+async function mixCutWhoosh(
+  execFileP: (file: string, args: string[]) => Promise<void>,
+  voicePath: string,
+  cutTimesSec: number[],
+  outPath: string,
+) {
+  if (cutTimesSec.length === 0) {
+    await fs.copyFile(voicePath, outPath);
+    return;
+  }
+
+  const args = ["-y", "-i", voicePath];
+  for (const t of cutTimesSec) {
+    const ms = Math.round(t * 1000);
+    args.push(
+      "-f",
+      "lavfi",
+      "-i",
+      `anoisesrc=d=0.07:c=pink:a=0.12,highpass=f=800,adelay=${ms}|${ms}`,
+    );
+  }
+  const mixInputs = `[0:a]${cutTimesSec.map((_, i) => `[${i + 1}:a]`).join("")}`;
+  const filter = `${mixInputs}amix=inputs=${cutTimesSec.length + 1}:duration=first:dropout_transition=0,alimiter=limit=0.95[aout]`;
+  args.push("-filter_complex", filter, "-map", "[aout]", "-ar", "24000", "-ac", "1", outPath);
+  await execFileP("ffmpeg", args);
+}
+
 async function renderRemotionVideo(
   projectDir: string,
   plan: VideoPlan,
@@ -1572,12 +1655,19 @@ async function renderRemotionVideo(
       });
     });
 
+  let muxAudioPath = audioPath;
+  if (prefs.enableCutSfx) {
+    const cuts = sceneCutTimesSec(plan.scenes);
+    muxAudioPath = path.join(renderDir, "voice_with_cuts.wav");
+    await mixCutWhoosh(execFileP, audioPath, cuts, muxAudioPath);
+  }
+
   await execFileP("ffmpeg", [
     "-y",
     "-i",
     silentOut,
     "-i",
-    audioPath,
+    muxAudioPath,
     "-map",
     "0:v:0",
     "-map",

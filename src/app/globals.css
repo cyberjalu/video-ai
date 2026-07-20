@@ -1,0 +1,48 @@
+@import "../tailwind-generated.css";
+
+:root {
+  --app-bg: #07080a;
+  --app-panel: rgba(15, 16, 20, 0.9);
+  --app-text: #eef2f7;
+  --app-text-muted: #a4afbf;
+  --app-accent: #63d6f3;
+  --font-ui: "Montserrat", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Newsreader", ui-serif, Georgia, serif;
+}
+
+@layer base {
+  html,
+  body {
+    min-height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background:
+      radial-gradient(circle at top left, rgba(99, 214, 243, 0.08), transparent 26%),
+      radial-gradient(circle at 82% 12%, rgba(77, 130, 255, 0.08), transparent 22%),
+      linear-gradient(180deg, #0a0b0f 0%, var(--app-bg) 100%);
+    color: var(--app-text);
+    font-family: var(--font-ui);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  [data-display="true"] {
+    font-family: var(--font-display);
+    letter-spacing: -0.03em;
+  }
+}
+
+@layer components {
+  .surface-panel {
+    @apply border border-white/[0.06] bg-[rgba(12,14,18,0.72)] backdrop-blur-xl;
+  }
+
+  .eyebrow-label {
+    @apply text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500;
+  }
+}

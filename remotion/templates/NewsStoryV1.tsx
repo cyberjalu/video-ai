@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { AbsoluteFill, Audio, Sequence, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Audio, Sequence, useCurrentFrame, useVideoConfig } from "remotion";
 import { TechnicalGlitchBg } from "./TechnicalGlitchBg";
 import {
   SceneVisual,
@@ -7,8 +7,8 @@ import {
   type SceneLayout,
   type StatData,
 } from "../components/SceneVisuals";
+import { CutFlashOverlay, SceneChrome, type InterruptStrength } from "../components/SceneChrome";
 
-// Montserrat (includes Vietnamese glyphs via latin-ext)
 import "@fontsource/montserrat/400.css";
 import "@fontsource/montserrat/600.css";
 import "@fontsource/montserrat/700.css";
@@ -24,6 +24,8 @@ export type NewsScene = {
   voiceover: string;
   layout?: SceneLayout;
   callouts?: string[];
+  caption_emphasis?: string[];
+  interrupt_strength?: InterruptStrength;
   screenshot_path?: string;
   screenshot_src?: string;
   broll_path?: string;
@@ -51,122 +53,32 @@ export const calcDurationInFrames = ({ props, fps }: { props: NewsStoryV1Props; 
   return Math.max(Math.round((totalSec || 60) * fps), fps * 10);
 };
 
-const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
-
-const ProgressBadge: React.FC<{ index: number; total: number }> = ({ index, total }) => {
-  return (
-    <div
-      style={{
-        alignSelf: "flex-start",
-        padding: "8px 14px",
-        borderRadius: 999,
-        border: "1px solid rgba(0,255,255,0.25)",
-        background: "rgba(0,0,0,0.42)",
-        color: "white",
-        fontSize: 22,
-        fontWeight: 700,
-        boxShadow: "0 0 24px rgba(0,255,255,0.14)",
-      }}
-    >
-      {index + 1}/{total}
-    </div>
-  );
-};
-
-const CalloutChips: React.FC<{ items: string[]; frame: number; enabled: boolean }> = ({
-  items,
-  frame,
-  enabled,
-}) => {
-  if (!enabled || items.length === 0) return null;
-  return (
-    <div
-      style={{
-        display: "flex",
-        gap: 12,
-        flexWrap: "wrap",
-        justifyContent: "center",
-        width: "100%",
-        maxWidth: 920,
-      }}
-    >
-      {items.slice(0, 2).map((item, idx) => {
-        const enterStart = idx === 0 ? 0 : 16;
-        const local = Math.max(0, frame - enterStart);
-        const opacity = interpolate(local, [0, 6], [0, 1], {
-          extrapolateLeft: "clamp",
-          extrapolateRight: "clamp",
-        });
-        const scale = interpolate(local, [0, 8], [0.94, 1], {
-          extrapolateLeft: "clamp",
-          extrapolateRight: "clamp",
-        });
-        return (
-          <div
-            key={`${item}-${idx}`}
-            style={{
-              opacity,
-              transform: `scale(${scale})`,
-              padding: "10px 14px",
-              borderRadius: 14,
-              background: "rgba(7,17,38,0.72)",
-              border: "1px solid rgba(0,255,255,0.25)",
-              color: "white",
-              fontSize: 26,
-              fontWeight: 600,
-              boxShadow: "0 10px 24px rgba(0,0,0,0.5), 0 0 16px rgba(0,255,255,0.16)",
-            }}
-          >
-            {item}
-          </div>
-        );
-      })}
-    </div>
-  );
-};
-
-const CutFlashOverlay: React.FC<{ cutFrames: number[] }> = ({ cutFrames }) => {
-  const frame = useCurrentFrame();
-  let intensity = 0;
-  for (const cut of cutFrames) {
-    const distance = Math.abs(frame - cut);
-    if (distance <= 7) {
-      intensity = Math.max(intensity, 1 - distance / 7);
-    }
-  }
-  if (intensity <= 0) return null;
-  return (
-    <AbsoluteFill
-      style={{
-        pointerEvents: "none",
-        background:
-          "linear-gradient(140deg, rgba(0,255,255,0.5) 0%, rgba(255,255,255,0.0) 40%, rgba(255,0,255,0.48) 100%)",
-        mixBlendMode: "screen",
-        opacity: intensity * 0.42,
-      }}
-    />
-  );
-};
-
 const SceneView: React.FC<{
   scene: NewsScene;
   sceneIndex: number;
   totalScenes: number;
+  sceneStartFrame: number;
+  totalDurationFrames: number;
   showProgress: boolean;
   showCallouts: boolean;
-}> = ({ scene, sceneIndex, totalScenes, showProgress, showCallouts }) => {
+  layoutMode: "tri" | "dual" | "mono";
+}> = ({
+  scene,
+  sceneIndex,
+  totalScenes,
+  sceneStartFrame,
+  totalDurationFrames,
+  showProgress,
+  showCallouts,
+  layoutMode,
+}) => {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
 
-  const caption = scene.caption_lines.join("\n");
-  const fontSize = clamp(52 - Math.max(0, caption.length - 70) * 0.35, 34, 52);
-
-  const safePadTop = 100;
-  const safePadBottom = 250;
-  const safePadX = 64;
   const layout = scene.layout ?? "screenshot";
   const callouts = scene.callouts ?? [];
-  const cardHeight = layout === "split" ? 360 : 500;
+  const cardHeight =
+    layout === "split" ? 360 : layoutMode === "mono" ? 560 : layoutMode === "dual" ? 480 : 500;
   const bigCalloutText = callouts[0] ?? scene.caption_lines[0];
 
   return (
@@ -180,10 +92,10 @@ const SceneView: React.FC<{
       />
       <AbsoluteFill
         style={{
-          paddingTop: safePadTop,
-          paddingBottom: safePadBottom,
-          paddingLeft: safePadX,
-          paddingRight: safePadX,
+          paddingTop: 100,
+          paddingBottom: 250,
+          paddingLeft: 64,
+          paddingRight: 64,
           display: "flex",
           flexDirection: "column",
           justifyContent: "center",
@@ -192,47 +104,37 @@ const SceneView: React.FC<{
           textAlign: "center",
         }}
       >
-        {showProgress ? <ProgressBadge index={sceneIndex} total={totalScenes} /> : null}
-        <SceneVisual
+        <SceneChrome
+          variant="neon"
+          role={scene.role}
+          sceneIndex={sceneIndex}
+          totalScenes={totalScenes}
+          sceneStartFrame={sceneStartFrame}
+          totalDurationFrames={totalDurationFrames}
+          frame={frame}
+          captionLines={scene.caption_lines}
+          captionEmphasis={scene.caption_emphasis}
+          callouts={callouts}
           layout={layout}
-          screenshotSrc={scene.screenshot_src}
-          brollSrc={scene.broll_src}
-          stat={scene.stat}
-          chart={scene.chart}
-          calloutText={bigCalloutText}
-          imageFit={scene.image_fit}
-          frame={frame}
-          height={cardHeight}
-          durationInFrames={durationInFrames}
-          theme="neon"
-        />
-
-        <CalloutChips
-          items={callouts}
-          frame={frame}
-          enabled={showCallouts && (layout === "big_callout" || layout === "stat")}
-        />
-
-        <div
-          style={{
-            whiteSpace: "pre-line",
-            color: "white",
-            fontSize,
-            fontWeight: 700,
-            lineHeight: 1.15,
-            textShadow: "0 4px 20px rgba(0,0,0,0.85), 0 0 14px rgba(0,255,255,0.12)",
-            width: "100%",
-            maxWidth: 920,
-            wordWrap: "break-word",
-            background: "rgba(0,0,0,0.38)",
-            padding: "22px 30px",
-            borderRadius: 16,
-            backdropFilter: "blur(10px)",
-            border: "1px solid rgba(255,255,255,0.10)",
-          }}
+          showProgress={showProgress}
+          showCallouts={showCallouts}
+          interruptStrength={scene.interrupt_strength}
         >
-          {caption}
-        </div>
+          <SceneVisual
+            layout={layout}
+            screenshotSrc={scene.screenshot_src}
+            brollSrc={scene.broll_src}
+            stat={scene.stat}
+            chart={scene.chart}
+            calloutText={bigCalloutText}
+            captionLines={scene.caption_lines}
+            imageFit={scene.image_fit}
+            frame={frame}
+            height={cardHeight}
+            durationInFrames={durationInFrames}
+            theme="neon"
+          />
+        </SceneChrome>
       </AbsoluteFill>
     </AbsoluteFill>
   );
@@ -245,6 +147,7 @@ export const NewsStoryV1: React.FC<NewsStoryV1Props> = ({
   scenes,
   showProgress = true,
   showCallouts = true,
+  layoutMode = "tri",
 }) => {
   const { fps } = useVideoConfig();
 
@@ -259,6 +162,10 @@ export const NewsStoryV1: React.FC<NewsStoryV1Props> = ({
     });
   }, [scenes, fps]);
   const cutFrames = useMemo(() => seq.slice(1).map((s) => s.from), [seq]);
+  const totalDurationFrames = useMemo(
+    () => seq.reduce((sum, s) => sum + s.frames, 0),
+    [seq],
+  );
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#070A12" }}>
@@ -270,12 +177,15 @@ export const NewsStoryV1: React.FC<NewsStoryV1Props> = ({
             scene={scene}
             sceneIndex={index}
             totalScenes={seq.length}
+            sceneStartFrame={from}
+            totalDurationFrames={totalDurationFrames}
             showProgress={showProgress}
             showCallouts={showCallouts}
+            layoutMode={layoutMode}
           />
         </Sequence>
       ))}
-      <CutFlashOverlay cutFrames={cutFrames} />
+      <CutFlashOverlay cutFrames={cutFrames} variant="neon" />
       <div style={{ display: "none" }}>{title}</div>
     </AbsoluteFill>
   );

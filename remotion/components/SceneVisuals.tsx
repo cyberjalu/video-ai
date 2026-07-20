@@ -318,9 +318,17 @@ export const BrollCard: React.FC<{
 export const BigCalloutCard: React.FC<{
   text: string;
   height?: number;
+  frame?: number;
   theme?: SceneVisualTheme;
-}> = ({ text, theme = "neon" }) => {
+}> = ({ text, frame = 0, theme = "neon" }) => {
   const t = THEMES[theme];
+  const progress = interpolate(frame, [0, 10], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  const scale = interpolate(progress, [0, 1], [0.82, 1]);
+  const opacity = interpolate(progress, [0, 0.4, 1], [0, 1, 1]);
+
   return (
     <div
       style={{
@@ -331,6 +339,8 @@ export const BigCalloutCard: React.FC<{
         background: t.panel,
         padding: "36px 30px",
         boxShadow: t.glow,
+        transform: `scale(${scale})`,
+        opacity,
       }}
     >
       <div
@@ -348,6 +358,86 @@ export const BigCalloutCard: React.FC<{
   );
 };
 
+export const SplitCard: React.FC<{
+  screenshotSrc?: string;
+  calloutText?: string;
+  captionLines?: string[];
+  frame: number;
+  height: number;
+  imageFit?: "cover" | "contain";
+  theme?: SceneVisualTheme;
+}> = ({ screenshotSrc, calloutText, captionLines = [], frame, height, imageFit = "cover", theme = "neon" }) => {
+  const t = THEMES[theme];
+  const enter = interpolate(frame, [0, 12], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  const text = calloutText || captionLines[0] || captionLines.join(" · ") || "Key point";
+
+  if (!screenshotSrc) {
+    return <BigCalloutCard text={text} frame={frame} theme={theme} />;
+  }
+
+  return (
+    <div
+      style={{
+        ...cardShell(theme, height),
+        opacity: enter,
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 0,
+      }}
+    >
+      <div style={{ position: "relative", overflow: "hidden", minHeight: height }}>
+        <Img
+          src={screenshotSrc}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: imageFit,
+          }}
+        />
+      </div>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          padding: "28px 24px",
+          background: t.panel,
+          textAlign: "left",
+        }}
+      >
+        <div
+          style={{
+            color: t.accent,
+            fontSize: 14,
+            fontWeight: 700,
+            letterSpacing: 1.2,
+            textTransform: "uppercase",
+            marginBottom: 12,
+          }}
+        >
+          Proof
+        </div>
+        <div
+          style={{
+            color: t.text,
+            fontSize: clamp(36 - Math.max(0, text.length - 20) * 0.4, 24, 36),
+            fontWeight: 700,
+            lineHeight: 1.15,
+          }}
+        >
+          {text}
+        </div>
+        {captionLines[1] ? (
+          <div style={{ color: t.muted, fontSize: 20, marginTop: 12, fontWeight: 600 }}>{captionLines[1]}</div>
+        ) : null}
+      </div>
+    </div>
+  );
+};
+
 export const SceneVisual: React.FC<{
   layout?: SceneLayout | string;
   screenshotSrc?: string;
@@ -355,6 +445,7 @@ export const SceneVisual: React.FC<{
   stat?: StatData;
   chart?: ChartData;
   calloutText?: string;
+  captionLines?: string[];
   imageFit?: "cover" | "contain";
   frame: number;
   height: number;
@@ -367,12 +458,26 @@ export const SceneVisual: React.FC<{
   stat,
   chart,
   calloutText,
+  captionLines,
   imageFit,
   frame,
   height,
   durationInFrames,
   theme = "neon",
 }) => {
+  if (layout === "split") {
+    return (
+      <SplitCard
+        screenshotSrc={screenshotSrc}
+        calloutText={calloutText}
+        captionLines={captionLines}
+        frame={frame}
+        height={height}
+        imageFit={imageFit}
+        theme={theme}
+      />
+    );
+  }
   if (layout === "stat" && stat) {
     return <StatCard stat={stat} frame={frame} height={height} theme={theme} />;
   }
@@ -380,7 +485,7 @@ export const SceneVisual: React.FC<{
     return <BarChartCard chart={chart} frame={frame} height={height} theme={theme} />;
   }
   if (layout === "big_callout") {
-    return <BigCalloutCard text={calloutText || ""} theme={theme} />;
+    return <BigCalloutCard text={calloutText || ""} frame={frame} theme={theme} />;
   }
   if (layout === "broll") {
     return <BrollCard brollSrc={brollSrc} height={height} theme={theme} />;

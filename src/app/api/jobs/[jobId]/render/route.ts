@@ -1,0 +1,30 @@
+import { NextResponse } from "next/server";
+import { readJob, readRequest } from "@/server/jobs/store";
+import { runRenderStage } from "@/server/pipeline";
+import type { GenerationRequest } from "@/lib/domain/types";
+
+export async function POST(req: Request, ctx: { params: Promise<{ jobId: string }> }) {
+  const { jobId } = await ctx.params;
+  const job = await readJob(jobId);
+  if (!job) return NextResponse.json({ error: "Job not found" }, { status: 404 });
+  if (job.status !== "awaiting_review" && job.status !== "completed") {
+    return NextResponse.json({ error: "Job is not ready for render" }, { status: 409 });
+  }
+
+  const body = (await req.json().catch(() => ({}))) as { keys?: GenerationRequest["keys"] };
+  const stored = await readRequest(jobId);
+  if (!stored) return NextResponse.json({ error: "Missing job request" }, { status: 400 });
+
+  const gemini = body.keys?.gemini?.trim();
+  if (!gemini) {
+    return NextResponse.json({ error: "Gemini API key required" }, { status: 400 });
+  }
+
+  const request: GenerationRequest = {
+    ...stored,
+    keys: { gemini, pexels: body.keys?.pexels },
+  };
+
+  void runRenderStage(jobId, request);
+  return NextResponse.json({ status: "rendering" }, { status: 202 });
+}
