@@ -5,6 +5,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@/lib": path.resolve(__dirname, "src/lib-web"),
+      "@/server": path.resolve(__dirname, "src/server"),
     },
   },
   test: {

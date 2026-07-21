@@ -19,9 +19,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Generate Tailwind CSS
-        run: npm run generate:css
-
       - name: Typecheck
         run: npm run typecheck
 

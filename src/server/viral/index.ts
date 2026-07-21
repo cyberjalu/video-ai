@@ -1,6 +1,19 @@
 import { GoogleGenAI } from "@google/genai";
 import type { GenerationRequest, VideoPlan } from "@/lib/domain/types";
 
+export {
+  runCraftQc,
+  runCraftQcHeuristics,
+  buildCraftRewriteAppendix,
+  craftModeForPreset,
+  distillBeats,
+  type CraftReport,
+  type CraftCriterionId,
+  type CraftCriterionResult,
+  type StoryBeat,
+  type CraftQcOptions,
+} from "./craft";
+
 export type ViralTone = "news" | "drama" | "data";
 
 export type ViralBrief = {
@@ -47,16 +60,16 @@ export async function generateViralBrief(request: GenerationRequest): Promise<Vi
   const ai = new GoogleGenAI({ apiKey: gemini });
   const model = request.options.contentModel ?? "gemini-3.5-flash";
 
-  const prompt = `You are a TikTok viral content strategist. Tone: ${tone}.
+  const prompt = `You are a TikTok viral content strategist and short-form director. Tone: ${tone}.
 Topic: ${topic}
 
 Return ONLY JSON:
 {
-  "hookAngle": "one-line scroll-stopping hook",
+  "hookAngle": "one-line scroll-stopping hook with a SPECIFIC situation, number, or named failure — not a generic question",
   "controversy": "optional tension angle or empty string",
-  "keyStat": "optional striking number/fact or empty string",
-  "cta": "end CTA for comments/follows",
-  "enhancedPrompt": "2-4 sentence brief for a video writer: include hook, arc, re-hook, CTA, FYP pacing"
+  "keyStat": "optional striking number/fact from the topic or empty string — NEVER invent numbers",
+  "cta": "end CTA = clear action + short reason tied to the story",
+  "enhancedPrompt": "2-4 sentence brief for a video writer: specific hook, escalating re-hook (new angle), proof beats, conversational voice (no brochure slogans), CTA with reason, FYP pacing"
 }`;
 
   const res = await ai.models.generateContent({

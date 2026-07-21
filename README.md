@@ -11,22 +11,37 @@
 
 ---
 
+## 🎧 Ủng hộ tác giả — Radio English
+
+Đang học tiếng Anh? Thử **[Radio English](https://kaku.io.vn/radio-english)** — app nghe thụ động kiểu radio + luyện nói AI cho người Việt (transcript EN+VI, shadowing, Free Talk).
+
+**Cách ủng hộ dự án ClipNews (và team):**
+
+1. **Tải** app tại [kaku.io.vn/radio-english](https://kaku.io.vn/radio-english) (App Store)
+2. **Mua Pro** nếu hợp gu — giúp duy trì sản phẩm miễn phí / OSS
+3. **Đánh giá 5★** trên App Store — một review ngắn cũng rất có ích
+
+Cảm ơn bạn đã ủng hộ!
+
+---
+
 ## Mục lục
 
-1. [Tính năng chính](#tính-năng-chính)
-2. [Tech stack](#tech-stack)
-3. [Kiến trúc tổng quan](#kiến-trúc-tổng-quan)
-4. [Luồng tạo video](#luồng-tạo-video)
-5. [Các trang & chức năng UI](#các-trang--chức-năng-ui)
-6. [Template & preset](#template--preset)
-7. [Yêu cầu hệ thống](#yêu-cầu-hệ-thống)
-8. [Cài đặt nhanh](#cài-đặt-nhanh)
-9. [Biến môi trường](#biến-môi-trường)
-10. [Docker](#docker)
-11. [CLI worker](#cli-worker)
-12. [Bảo mật & giới hạn](#bảo-mật--giới-hạn)
-13. [Scripts phát triển](#scripts-phát-triển)
-14. [License](#license)
+1. [Ủng hộ — Radio English](#-ủng-hộ-tác-giả--radio-english)
+2. [Tính năng chính](#tính-năng-chính)
+3. [Tech stack](#tech-stack)
+4. [Kiến trúc tổng quan](#kiến-trúc-tổng-quan)
+5. [Luồng tạo video](#luồng-tạo-video)
+6. [Các trang & chức năng UI](#các-trang--chức-năng-ui)
+7. [Template & preset](#template--preset)
+8. [Yêu cầu hệ thống](#yêu-cầu-hệ-thống)
+9. [Cài đặt nhanh](#cài-đặt-nhanh)
+10. [Biến môi trường](#biến-môi-trường)
+11. [Docker](#docker)
+12. [CLI worker](#cli-worker)
+13. [Bảo mật & giới hạn](#bảo-mật--giới-hạn)
+14. [Scripts phát triển](#scripts-phát-triển)
+15. [License](#license)
 
 ---
 
@@ -397,7 +412,6 @@ Output mặc định: `output/<timestamp>__…/render/out.mp4`.
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run worker:render` | CLI pipeline |
 | `npm run cleanup:jobs` | Xóa job hết hạn + reap stuck |
-| `npm run generate:css` | Build Tailwind generated CSS |
 
 Đóng góp: xem [CONTRIBUTING.md](CONTRIBUTING.md).
 

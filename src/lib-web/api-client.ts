@@ -62,6 +62,15 @@ export async function getJob(jobId: string) {
       fullCaption: string;
     };
     qc?: { pass: boolean; score: number; reasons: string[] };
+    craftReport?: {
+      pass: boolean;
+      score: number;
+      threshold: number;
+      reasons: string[];
+      mode: "light" | "full";
+      judgedBy: "heuristics" | "heuristics+llm";
+      rewritten: boolean;
+    };
     error?: string;
     expiresAt: string;
   }>;
@@ -90,6 +99,22 @@ export async function startRender(jobId: string) {
     throw new Error(typeof err.error === "string" ? err.error : "Failed to start render");
   }
   return res.json() as Promise<{ status: string }>;
+}
+
+/** Resume a failed/cancelled job (re-plan or re-render depending on whether a plan exists). */
+export async function continueJob(jobId: string) {
+  const res = await fetch(`/api/jobs/${jobId}/continue`, {
+    method: "POST",
+    headers: authHeaders(jobId),
+    body: JSON.stringify({
+      keys: { gemini: loadSessionGeminiKey(), pexels: loadSessionPexelsKey() || undefined },
+    }),
+  });
+  if (!res.ok) {
+    const err = (await res.json()) as { error?: string };
+    throw new Error(typeof err.error === "string" ? err.error : "Failed to continue job");
+  }
+  return res.json() as Promise<{ status: string; mode: "plan" | "render" }>;
 }
 
 export async function cancelJob(jobId: string) {

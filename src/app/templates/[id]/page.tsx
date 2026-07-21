@@ -16,19 +16,17 @@ export default async function TemplateDetailPage({
     <WebShell
       header={
         <div>
-          <Link href="/templates" className="text-xs text-zinc-500 hover:text-zinc-300">
+          <Link href="/templates" className="text-xs text-[var(--ink-faint)] hover:text-[var(--ink)]">
             ← Templates
           </Link>
-          <h1 className="mt-2 text-2xl font-semibold" data-display="true">
-            {tpl.name}
-          </h1>
+          <h1 className="display-title mt-2 text-3xl text-[var(--ink)]">{tpl.name}</h1>
         </div>
       }
     >
-      <div className="surface-panel max-w-2xl rounded-2xl p-6">
-        <p className="text-zinc-300">{tpl.description}</p>
+      <div className="surface-panel-strong max-w-2xl rounded-[22px] p-6">
+        <p className="text-[var(--ink-muted)]">{tpl.description}</p>
         {tpl.useCases?.length ? (
-          <ul className="mt-4 list-disc space-y-1 pl-5 text-sm text-zinc-400">
+          <ul className="mt-4 list-disc space-y-1 pl-5 text-sm text-[var(--ink-muted)]">
             {tpl.useCases.map((u) => (
               <li key={u}>{u}</li>
             ))}
@@ -36,9 +34,10 @@ export default async function TemplateDetailPage({
         ) : null}
         <Link
           href={`/generate/${tpl.id}`}
-          className="mt-6 inline-flex rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-5 py-2.5 text-sm font-semibold text-cyan-100"
+          className="relative mt-6 inline-flex items-center justify-center overflow-hidden rounded-2xl border border-[color-mix(in_srgb,var(--signal)_25%,transparent)] bg-linear-[180deg,#7ce3f8_0%,#48c8ec_52%,#2f9ec5_100%] px-5 py-3 text-sm font-bold text-slate-950 shadow-[0_1px_0_rgba(255,255,255,0.45)_inset,0_12px_30px_rgba(44,167,203,0.28)] transition-all duration-200 hover:-translate-y-px active:scale-[0.985]"
         >
-          Use this template
+          <span className="pointer-events-none absolute inset-0 signal-sweep bg-[linear-gradient(110deg,transparent_0%,rgba(255,255,255,0.08)_45%,rgba(255,255,255,0.36)_50%,rgba(255,255,255,0.06)_56%,transparent_100%)]" />
+          <span className="relative">Use this template</span>
         </Link>
       </div>
     </WebShell>

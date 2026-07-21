@@ -45,12 +45,12 @@ export default function BatchDetailPage() {
     <WebShell
       header={
         <div>
-          <Link href="/batch" className="text-xs text-zinc-500 hover:text-zinc-300">
+          <Link href="/batch" className="text-xs text-[var(--ink-faint)] hover:text-[var(--ink)]">
             ← New batch
           </Link>
           <h1 className="mt-2 text-xl font-semibold">Batch {batchId.slice(0, 8)}…</h1>
           {batch ? (
-            <p className="mt-1 text-sm text-zinc-400">
+            <p className="mt-1 text-sm text-[var(--ink-muted)]">
               {batch.status} · {batch.progress.completed}/{batch.progress.total} done ·{" "}
               {batch.progress.percent}%
             </p>
@@ -62,13 +62,13 @@ export default function BatchDetailPage() {
         <>
           <div className="mb-4 h-2 overflow-hidden rounded-full bg-white/10">
             <div
-              className="h-full bg-cyan-400/70 transition-all"
+              className="h-full bg-[var(--signal)]/70 transition-all"
               style={{ width: `${batch.progress.percent}%` }}
             />
           </div>
           <a
             href={`/api/batches/${batchId}/download`}
-            className="mb-4 inline-flex rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-sm font-semibold text-cyan-100"
+            className="mb-4 inline-flex rounded-xl border border-[color-mix(in_srgb,var(--signal)_35%,transparent)] bg-[var(--signal-dim)] px-4 py-2 text-sm font-semibold text-[var(--signal)]"
           >
             Download ZIP / captions
           </a>
@@ -79,16 +79,16 @@ export default function BatchDetailPage() {
                 className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm"
               >
                 <div className="min-w-0">
-                  <div className="truncate text-zinc-200">
+                  <div className="truncate text-[var(--ink)]">
                     #{item.index + 1} · {item.input.url ?? item.input.prompt ?? "item"}
                   </div>
-                  <div className="text-xs text-zinc-500">
+                  <div className="text-xs text-[var(--ink-faint)]">
                     {item.status}
                     {item.error ? ` — ${item.error}` : ""}
                   </div>
                 </div>
                 {item.jobId ? (
-                  <Link href={`/jobs/${item.jobId}`} className="shrink-0 text-xs text-cyan-300">
+                  <Link href={`/jobs/${item.jobId}`} className="shrink-0 text-xs text-[var(--signal)]">
                     Open job
                   </Link>
                 ) : null}
@@ -97,7 +97,7 @@ export default function BatchDetailPage() {
           </ul>
         </>
       ) : (
-        <p className="text-sm text-zinc-500">Loading…</p>
+        <p className="text-sm text-[var(--ink-faint)]">Loading…</p>
       )}
     </WebShell>
   );

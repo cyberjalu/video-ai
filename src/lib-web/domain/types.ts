@@ -1,3 +1,9 @@
+import { DEFAULT_GEMINI_TTS_VOICE } from "@/lib/gemini-voices";
+import {
+  DEFAULT_GEMINI_AUDIO_MODEL,
+  DEFAULT_GEMINI_CONTENT_MODEL,
+} from "@/lib/gemini-models";
+
 export type RenderPreset = "deep_explainer" | "news_60_80" | "ultra_25_35" | "viral_30_45";
 export type LayoutMode = "tri" | "mono" | "dual";
 export type TemplateId = "NewsStoryV1" | "CorporateNewsV1" | "YouTubeStoryV1" | "ViralNewsV1";
@@ -21,9 +27,9 @@ export const DEFAULT_OPTIONS: RenderOptions = {
   enable_progress: true,
   enable_cut_sfx: false,
   layout_mode: "tri",
-  voice: "Zephyr",
-  contentModel: "gemini-3.5-flash",
-  audioModel: "gemini-3.1-flash-tts-preview",
+  voice: DEFAULT_GEMINI_TTS_VOICE,
+  contentModel: DEFAULT_GEMINI_CONTENT_MODEL,
+  audioModel: DEFAULT_GEMINI_AUDIO_MODEL,
 };
 
 export type RenderJobStatus =

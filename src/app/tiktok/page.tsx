@@ -96,11 +96,11 @@ function TikTokInner() {
     <WebShell
       header={
         <div>
-          <Link href={jobId ? `/jobs/${jobId}/result` : "/"} className="text-xs text-zinc-500 hover:text-zinc-300">
+          <Link href={jobId ? `/jobs/${jobId}/result` : "/"} className="text-xs text-[var(--ink-faint)] hover:text-[var(--ink)]">
             ← Back
           </Link>
           <h1 className="mt-2 text-xl font-semibold">Publish to TikTok</h1>
-          <p className="mt-1 text-sm text-zinc-400">
+          <p className="mt-1 text-sm text-[var(--ink-muted)]">
             Connect your TikTok account, confirm, then publish. Max 5 posts/day. No silent auto-post.
           </p>
         </div>
@@ -110,12 +110,12 @@ function TikTokInner() {
         {!tokens ? (
           <a
             href="/api/tiktok/auth"
-            className="inline-flex rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-sm font-semibold text-cyan-100"
+            className="inline-flex rounded-xl border border-[color-mix(in_srgb,var(--signal)_35%,transparent)] bg-[var(--signal-dim)] px-4 py-2 text-sm font-semibold text-[var(--signal)]"
           >
             Connect TikTok
           </a>
         ) : (
-          <p className="text-sm text-zinc-300">
+          <p className="text-sm text-[var(--ink-muted)]">
             Connected{tokens.open_id ? ` · ${tokens.open_id.slice(0, 8)}…` : ""}. Tokens stay in this
             browser session only.
           </p>
@@ -123,8 +123,8 @@ function TikTokInner() {
 
         {jobId ? (
           <>
-            <p className="text-xs text-zinc-500">Job: {jobId.slice(0, 8)}…</p>
-            <label className="flex items-center gap-2 text-sm text-zinc-400">
+            <p className="text-xs text-[var(--ink-faint)]">Job: {jobId.slice(0, 8)}…</p>
+            <label className="flex items-center gap-2 text-sm text-[var(--ink-muted)]">
               <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
               I confirm I want to publish this video to my TikTok account
             </label>
@@ -132,18 +132,18 @@ function TikTokInner() {
               type="button"
               disabled={!tokens || !confirmed || busy}
               onClick={() => void onPublish()}
-              className="rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-sm font-semibold text-cyan-100 disabled:opacity-50"
+              className="rounded-xl border border-[color-mix(in_srgb,var(--signal)_35%,transparent)] bg-[var(--signal-dim)] px-4 py-2 text-sm font-semibold text-[var(--signal)] disabled:opacity-50"
             >
               {busy ? "Publishing…" : "Publish now"}
             </button>
           </>
         ) : (
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-[var(--ink-faint)]">
             Open this page from a job result (Publish to TikTok) to select a video.
           </p>
         )}
 
-        {message ? <p className="text-sm text-cyan-200">{message}</p> : null}
+        {message ? <p className="text-sm text-[var(--signal)]">{message}</p> : null}
         {error ? <p className="text-sm text-red-300">{error}</p> : null}
       </div>
     </WebShell>
@@ -152,7 +152,7 @@ function TikTokInner() {
 
 export default function TikTokPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-zinc-400">Loading…</div>}>
+    <Suspense fallback={<div className="p-8 text-[var(--ink-muted)]">Loading…</div>}>
       <TikTokInner />
     </Suspense>
   );

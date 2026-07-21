@@ -9,8 +9,8 @@ import { SecondaryButton } from "./Buttons";
 function MetaStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-white/[0.07] bg-black/30 px-3 py-2.5">
-      <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-600">{label}</div>
-      <div className="mt-1 text-sm font-bold text-zinc-200">{value}</div>
+      <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-faint)]">{label}</div>
+      <div className="mt-1 text-sm font-bold text-[var(--ink)]">{value}</div>
     </div>
   );
 }
@@ -25,11 +25,11 @@ function EmptyPreview() {
         </div>
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/5">
-            <Video className="h-4 w-4 text-zinc-500" />
+            <Video className="h-4 w-4 text-[var(--ink-faint)]" />
           </div>
         </div>
       </div>
-      <div className="text-sm font-semibold text-zinc-400">Video preview will appear here</div>
+      <div className="text-sm font-semibold text-[var(--ink-muted)]">Video preview will appear here</div>
     </Card>
   );
 }
@@ -104,7 +104,7 @@ export function VideoPreviewCard({
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
       <Card className="overflow-hidden p-5">
         <div className="flex items-center justify-between gap-3">
-          <div className="text-sm font-bold text-zinc-100">Preview</div>
+          <div className="text-sm font-bold text-[var(--ink)]">Preview</div>
           <SecondaryButton onClick={onCreateAnother} className="h-7 gap-1.5 rounded-lg px-2.5 text-xs">
             <RotateCcw className="h-3.5 w-3.5" />
             New
@@ -136,12 +136,12 @@ export function VideoPreviewCard({
               {loadError ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/80 px-4 text-center">
                   <AlertTriangle className="h-5 w-5 text-amber-300" />
-                  <div className="text-[11px] text-zinc-300">{loadError}</div>
+                  <div className="text-[11px] text-[var(--ink-muted)]">{loadError}</div>
                 </div>
               ) : null}
               {!ready && !loadError ? (
                 <div className="absolute inset-0 grid place-items-center bg-zinc-950/80">
-                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-cyan-300" />
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-[var(--signal)]" />
                 </div>
               ) : null}
               {!isPlaying && ready && !loadError ? (
@@ -162,8 +162,8 @@ export function VideoPreviewCard({
 
         {title || source ? (
           <div className="mt-5">
-            {title ? <div className="text-sm font-semibold text-zinc-100">{title}</div> : null}
-            {source ? <div className="mt-1 text-xs text-zinc-500">{source}</div> : null}
+            {title ? <div className="text-sm font-semibold text-[var(--ink)]">{title}</div> : null}
+            {source ? <div className="mt-1 text-xs text-[var(--ink-faint)]">{source}</div> : null}
           </div>
         ) : null}
 
@@ -178,10 +178,11 @@ export function VideoPreviewCard({
           <a
             href={mp4Url}
             download
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-zinc-100 px-4 py-3.5 text-sm font-bold text-zinc-900"
+            className="group/btn relative inline-flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl border border-teal-300/40 bg-[var(--signal)] px-4 py-3.5 text-sm font-semibold text-[var(--void)] shadow-[0_1px_0_rgba(255,255,255,0.35)_inset,0_10px_28px_rgba(94,234,212,0.22)] transition duration-150 hover:-translate-y-px hover:brightness-105 active:scale-[0.985]"
           >
-            <Download className="h-4 w-4" />
-            Download MP4
+            <span className="pointer-events-none absolute inset-0 signal-sweep bg-[linear-gradient(110deg,transparent_0%,rgba(255,255,255,0.12)_46%,rgba(255,255,255,0.45)_50%,rgba(255,255,255,0.1)_54%,transparent_100%)]" />
+            <Download className="relative h-4 w-4" />
+            <span className="relative">Download MP4</span>
           </a>
           <SecondaryButton onClick={onCopyCaption} disabled={!captionText} className="w-full justify-center text-xs">
             <Copy className="h-3.5 w-3.5" />

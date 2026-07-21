@@ -20,7 +20,12 @@ export function GenerationStepper({
   onCancel,
   awaitingAssets = false,
   onContinueRender,
+  onContinueFailed,
   hasPexelsKey = false,
+  isBusy = false,
+  isFailed = false,
+  continueBusy = false,
+  hasPlan = false,
 }: {
   steps: UiStep[];
   progressPercent: number;
@@ -29,24 +34,34 @@ export function GenerationStepper({
   onCancel?: () => void;
   awaitingAssets?: boolean;
   onContinueRender?: () => void;
+  onContinueFailed?: () => void;
   hasPexelsKey?: boolean;
+  isBusy?: boolean;
+  isFailed?: boolean;
+  continueBusy?: boolean;
+  hasPlan?: boolean;
 }) {
+  const title = awaitingAssets
+    ? "Your turn — script & visuals"
+    : isFailed
+      ? "Pipeline stopped"
+      : "Rendering in progress";
+
   return (
     <Card variant="strong" className="overflow-hidden p-6">
-      {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="eyebrow-label mb-2">Broadcast Pipeline</div>
-          <div className="display-title text-[28px] leading-none text-zinc-100">
-            {awaitingAssets ? "Your turn — script & visuals" : "Rendering in progress"}
-          </div>
+          <div className="display-title text-[28px] leading-none text-[var(--ink)]">{title}</div>
         </div>
         <div className="flex flex-col items-end gap-2">
-          <div className="rounded-2xl border border-white/[0.07] bg-white/[0.03] px-3 py-2 text-right">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-600">Signal</div>
-            <div className="mt-1 flex items-center gap-3 text-xs text-zinc-500">
+          <div className="rounded-2xl border border-[var(--line-soft)] bg-white/[0.03] px-3 py-2 text-right">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--ink-faint)]">
+              Signal
+            </div>
+            <div className="mt-1 flex items-center gap-3 text-xs text-[var(--ink-muted)]">
               <span>{formatElapsed(elapsedMs)}</span>
-              <span className="font-bold text-zinc-200">{progressPercent}%</span>
+              <span className="font-bold tabular-nums text-[var(--ink)]">{progressPercent}%</span>
             </div>
           </div>
           {onCancel ? (
@@ -57,25 +72,28 @@ export function GenerationStepper({
         </div>
       </div>
 
-      {/* Progress bar */}
-      <div className="mt-5 rounded-[22px] border border-white/[0.06] bg-black/20 px-4 py-4">
-        <div className="mb-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-600">
+      <div className="mt-5 rounded-[22px] border border-[var(--line-soft)] bg-black/20 px-4 py-4">
+        <div className="mb-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--ink-faint)]">
           <span>Pipeline Status</span>
-          <span>{steps.filter((step) => step.state === "completed").length}/{steps.length} phases locked</span>
+          <span>
+            {steps.filter((step) => step.state === "completed").length}/{steps.length} phases locked
+            {isBusy ? " · live" : ""}
+          </span>
         </div>
         <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-white/[0.05]">
           <motion.div
-            className="relative h-full rounded-full bg-linear-to-r from-sky-400 via-cyan-300 to-emerald-300"
+            className="relative h-full rounded-full bg-gradient-to-r from-teal-500 via-[var(--signal)] to-emerald-300"
             initial={{ width: "0%" }}
             animate={{ width: `${Math.min(100, Math.max(0, progressPercent))}%` }}
-            transition={{ duration: 0.5, ease: "easeOut" }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
           >
-            <div className="pointer-events-none absolute inset-0 signal-sweep bg-linear-to-r from-transparent via-white/45 to-transparent" />
+            {isBusy ? (
+              <div className="pointer-events-none absolute inset-0 signal-sweep bg-gradient-to-r from-transparent via-white/45 to-transparent" />
+            ) : null}
           </motion.div>
         </div>
       </div>
 
-      {/* Current step description */}
       <AnimatePresence mode="wait">
         {currentDescription ? (
           <motion.div
@@ -84,19 +102,24 @@ export function GenerationStepper({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.2 }}
-            className="surface-inset mt-4 rounded-[20px] px-4 py-3 text-sm leading-6 text-zinc-300"
+            className="surface-inset mt-4 rounded-[20px] px-4 py-3 text-sm leading-6 text-[var(--ink-muted)]"
           >
+            {isBusy ? (
+              <span className="mr-2 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--signal)] align-middle" />
+            ) : null}
             {currentDescription}
           </motion.div>
         ) : null}
       </AnimatePresence>
 
       {awaitingAssets && onContinueRender ? (
-        <div className="mt-4 rounded-[20px] border border-cyan-300/25 bg-cyan-300/10 px-4 py-4">
-          <div className="text-sm font-semibold text-zinc-100">Plan is ready — edit script &amp; visuals</div>
-          <div className="mt-1 text-sm text-zinc-400">
+        <div className="mt-4 rounded-[20px] border border-[color-mix(in_srgb,var(--signal)_30%,transparent)] bg-[var(--signal-dim)] px-4 py-4">
+          <div className="text-sm font-semibold text-[var(--ink)]">Plan is ready — edit script &amp; visuals</div>
+          <div className="mt-1 text-sm text-[var(--ink-muted)]">
             Tweak voiceover per scene, add or remove scenes, then attach image/video. Empty scenes
-            {hasPexelsKey ? " auto-fill from Pexels when you continue." : " need a Pexels key in Settings (or upload files)."}
+            {hasPexelsKey
+              ? " auto-fill from Pexels when you continue."
+              : " need a Pexels key in Settings (or upload files)."}
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
             <PrimaryButton type="button" onClick={onContinueRender}>
@@ -109,13 +132,34 @@ export function GenerationStepper({
         </div>
       ) : null}
 
-      {/* Steps */}
+      {isFailed && onContinueFailed ? (
+        <div className="mt-4 rounded-[20px] border border-[color-mix(in_srgb,var(--tally)_35%,transparent)] bg-[var(--tally-dim)] px-4 py-4">
+          <div className="text-sm font-semibold text-[var(--ink)]">
+            {hasPlan ? "Resume render" : "Resume planning"}
+          </div>
+          <div className="mt-1 text-sm text-[var(--ink-muted)]">
+            Job was cancelled or hit a rate limit. Progress updates live once you continue
+            {hasPlan ? " — your plan is kept." : " — planning restarts from the start."}
+          </div>
+          <div className="mt-4">
+            <PrimaryButton
+              type="button"
+              onClick={onContinueFailed}
+              disabled={continueBusy}
+              isLoading={continueBusy}
+            >
+              {continueBusy ? "Resuming…" : "Continue"}
+            </PrimaryButton>
+          </div>
+        </div>
+      ) : null}
+
       <div className="mt-5 space-y-2">
         {steps.map((s, index) => {
           const isAwaitingStep = awaitingAssets && s.id === "awaiting_assets" && s.state === "running";
           const isRunning = s.state === "running" && !isAwaitingStep;
           const isDone = s.state === "completed";
-          const isFailed = s.state === "failed";
+          const isFailedStep = s.state === "failed";
 
           return (
             <motion.div
@@ -126,49 +170,51 @@ export function GenerationStepper({
               className={cn(
                 "relative flex items-center gap-3 overflow-hidden rounded-[20px] border px-4 py-3 transition-all duration-300",
                 isAwaitingStep
-                  ? "border-amber-300/30 bg-[linear-gradient(180deg,rgba(251,191,36,0.12),rgba(255,255,255,0.03))]"
+                  ? "border-[color-mix(in_srgb,var(--tally)_35%,transparent)] bg-[linear-gradient(180deg,var(--tally-dim),rgba(255,255,255,0.03))]"
                   : isRunning
-                    ? "border-cyan-300/25 bg-[linear-gradient(180deg,rgba(99,214,243,0.12),rgba(255,255,255,0.03))] shadow-[0_12px_40px_rgba(24,105,132,0.16)]"
+                    ? "border-[color-mix(in_srgb,var(--signal)_30%,transparent)] bg-[linear-gradient(180deg,var(--signal-dim),rgba(255,255,255,0.03))] shadow-[0_12px_40px_rgba(94,234,212,0.12)]"
                     : isDone
                       ? "border-emerald-400/12 bg-emerald-400/5"
-                      : isFailed
+                      : isFailedStep
                         ? "border-red-400/15 bg-red-400/5"
-                        : "border-white/[0.05] bg-black/20",
+                        : "border-[var(--line-soft)] bg-black/20",
               )}
             >
-              {isRunning && <div className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-cyan-300" />}
-              {isAwaitingStep && <div className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-amber-300" />}
               {isRunning && (
-                <div className="ambient-breathe pointer-events-none absolute right-[-3rem] top-1/2 h-20 w-20 -translate-y-1/2 rounded-full bg-cyan-300/12 blur-2xl" />
+                <div className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-[var(--signal)]" />
               )}
-              {/* Step icon */}
+              {isAwaitingStep && (
+                <div className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-[var(--tally)]" />
+              )}
+              {isRunning && (
+                <div className="ambient-breathe pointer-events-none absolute right-[-3rem] top-1/2 h-20 w-20 -translate-y-1/2 rounded-full bg-[var(--signal)]/12 blur-2xl" />
+              )}
               <div className="shrink-0">
                 {isDone ? (
                   <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                ) : isFailed ? (
+                ) : isFailedStep ? (
                   <XCircle className="h-4 w-4 text-red-400" />
                 ) : isAwaitingStep ? (
-                  <Images className="h-4 w-4 text-amber-300" />
+                  <Images className="h-4 w-4 text-[var(--tally)]" />
                 ) : isRunning ? (
-                  <Loader2 className="h-4 w-4 animate-spin text-cyan-300" />
+                  <Loader2 className="h-4 w-4 animate-spin text-[var(--signal)]" />
                 ) : (
                   <Circle className="h-4 w-4 text-white/15" />
                 )}
               </div>
 
-              {/* Label + detail */}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-3">
                   <div
                     className={cn(
                       "truncate text-sm font-semibold uppercase tracking-[0.08em] transition-colors",
                       isAwaitingStep || isRunning
-                        ? "text-zinc-100"
+                        ? "text-[var(--ink)]"
                         : isDone
-                          ? "text-zinc-300"
-                          : isFailed
-                            ? "text-zinc-200"
-                            : "text-zinc-600",
+                          ? "text-[var(--ink-muted)]"
+                          : isFailedStep
+                            ? "text-[var(--ink)]"
+                            : "text-[var(--ink-faint)]",
                     )}
                   >
                     {s.label}
@@ -178,18 +224,18 @@ export function GenerationStepper({
                       "shrink-0 text-[10px] font-bold uppercase tracking-[0.18em]",
                       isDone
                         ? "text-emerald-400"
-                        : isFailed
+                        : isFailedStep
                           ? "text-red-400"
                           : isAwaitingStep
-                            ? "text-amber-300"
+                            ? "text-[var(--tally)]"
                             : isRunning
-                              ? "text-cyan-300"
-                              : "text-zinc-700",
+                              ? "text-[var(--signal)]"
+                              : "text-[var(--ink-faint)]",
                     )}
                   >
                     {isDone
                       ? "Done"
-                      : isFailed
+                      : isFailedStep
                         ? "Failed"
                         : isAwaitingStep
                           ? "Your turn"
@@ -199,11 +245,10 @@ export function GenerationStepper({
                   </div>
                 </div>
                 {s.detail ? (
-                  <div className="mt-1 truncate text-xs text-zinc-500">{s.detail}</div>
+                  <div className="mt-1 truncate text-xs text-[var(--ink-faint)]">{s.detail}</div>
                 ) : null}
               </div>
 
-              {/* Running shimmer overlay */}
               {isRunning && (
                 <div className="pointer-events-none absolute inset-0 rounded-[20px] shimmer" />
               )}

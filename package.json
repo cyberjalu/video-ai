@@ -5,9 +5,8 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "generate:css": "node generate-tailwind.cjs",
     "dev": "next dev",
-    "build": "node generate-tailwind.cjs && next build",
+    "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -17,8 +16,6 @@
     "cleanup:jobs": "tsx ./scripts/cleanup-jobs.ts"
   },
   "dependencies": {
-    "@fontsource/montserrat": "^5.2.8",
-    "@fontsource/newsreader": "^5.2.10",
     "@google/genai": "^1.0.0",
     "@mozilla/readability": "^0.5.0",
     "@remotion/bundler": "^4.0.287",
@@ -37,10 +34,10 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^24.0.0",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
-    "autoprefixer": "^10.5.0",
     "postcss": "^8.5.14",
     "tailwindcss": "^4.3.0",
     "tsx": "^4.20.5",

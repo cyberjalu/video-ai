@@ -10,15 +10,7 @@ const CATEGORIES: Array<{ id: TemplateCategory | "all"; label: string }> = [
   { id: "education", label: "Education" },
 ];
 
-export default function TemplatesPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ category?: string }>;
-}) {
-  return <TemplatesGallery searchParams={searchParams} />;
-}
-
-async function TemplatesGallery({
+export default async function TemplatesPage({
   searchParams,
 }: {
   searchParams: Promise<{ category?: string }>;
@@ -34,41 +26,61 @@ async function TemplatesGallery({
     <WebShell
       header={
         <div>
-          <Link href="/" className="text-xs text-zinc-500 hover:text-zinc-300">
+          <Link href="/" className="text-xs text-[var(--ink-faint)] transition hover:text-[var(--ink)]">
             ← Home
           </Link>
-          <h1 className="mt-2 text-2xl font-semibold" data-display="true">
-            Templates
-          </h1>
+          <h1 className="display-title mt-2 text-3xl text-[var(--ink)] md:text-4xl">Templates</h1>
+          <p className="mt-2 max-w-md text-sm leading-relaxed text-[var(--ink-muted)]">
+            Pick a look, then generate on your machine.
+          </p>
         </div>
       }
     >
-      <div className="mb-6 flex flex-wrap gap-2">
-        {CATEGORIES.map((c) => (
-          <Link
-            key={c.id}
-            href={c.id === "all" ? "/templates" : `/templates?category=${c.id}`}
-            className="rounded-full border border-white/10 px-3 py-1 text-xs font-semibold text-zinc-300 hover:border-cyan-400/30"
-          >
-            {c.label}
-          </Link>
-        ))}
+      <div className="mb-8 flex flex-wrap gap-2">
+        {CATEGORIES.map((c) => {
+          const active = (c.id === "all" && !cat) || cat === c.id;
+          return (
+            <Link
+              key={c.id}
+              href={c.id === "all" ? "/templates" : `/templates?category=${c.id}`}
+              className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition active:scale-[0.98] ${
+                active
+                  ? "border-teal-300/35 bg-[var(--signal-dim)] text-[var(--signal)]"
+                  : "border-[var(--line)] text-[var(--ink-faint)] hover:border-teal-300/25 hover:text-[var(--ink)]"
+              }`}
+            >
+              {c.label}
+            </Link>
+          );
+        })}
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {templates.map((tpl) => (
           <Link
             key={tpl.id}
             href={`/templates/${tpl.id}`}
-            className="surface-panel flex gap-4 rounded-2xl p-4 hover:border-cyan-400/20"
+            className="group overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--panel)] transition duration-200 hover:-translate-y-0.5 hover:border-teal-300/35 active:scale-[0.99]"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={tpl.thumbnail} alt="" className="h-24 w-14 rounded-lg object-cover" />
-            <div>
-              <div className="text-xs text-zinc-500">
+            <div className="relative aspect-[16/10] overflow-hidden bg-[var(--void)]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={tpl.thumbnail}
+                alt=""
+                className="absolute inset-0 h-full w-full object-cover object-top opacity-90 transition duration-500 group-hover:scale-[1.03]"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[var(--panel)] via-transparent to-transparent" />
+            </div>
+            <div className="relative -mt-8 px-4 pb-4">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--ink-faint)]">
                 {tpl.category} · {tpl.aspectRatio}
               </div>
-              <h2 className="font-semibold text-zinc-100">{tpl.name}</h2>
-              <p className="mt-1 line-clamp-2 text-sm text-zinc-400">{tpl.description}</p>
+              <h2 className="mt-1 text-base font-semibold text-[var(--ink)] group-hover:text-[var(--signal)]">
+                {tpl.name}
+              </h2>
+              <p className="mt-1 line-clamp-2 text-[13px] leading-relaxed text-[var(--ink-muted)]">
+                {tpl.description}
+              </p>
             </div>
           </Link>
         ))}

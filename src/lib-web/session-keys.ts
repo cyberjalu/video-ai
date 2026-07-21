@@ -7,6 +7,8 @@ const RENDER_PREFS_KEY = "clipnews.renderPrefs";
 export type SessionRenderPrefs = {
   preset?: "deep_explainer" | "news_60_80" | "ultra_25_35" | "viral_30_45";
   voice?: string;
+  contentModel?: string;
+  audioModel?: string;
   enable_cut_sfx?: boolean;
   enable_progress?: boolean;
 };

@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { VideoPreviewCard } from "@/components/VideoPreviewCard";
 import { WebShell } from "@/components/WebShell";
+import { SecondaryButton } from "@/components/Buttons";
 import { downloadUrl, getJob, startRender } from "@/lib/api-client";
 import { buildCaptionText } from "@/lib/job-utils";
 import { loadSessionGeminiKey } from "@/lib/session-keys";
@@ -61,13 +62,13 @@ export default function JobResultPage() {
     <WebShell
       header={
         <div>
-          <Link href={`/jobs/${jobId}`} className="text-xs text-zinc-500 hover:text-zinc-300">
+          <Link href={`/jobs/${jobId}`} className="text-xs text-[var(--ink-faint)] hover:text-[var(--ink)]">
             ← Job progress
           </Link>
-          <h1 className="mt-2 text-xl font-semibold">Your video</h1>
+          <h1 className="display-title mt-2 text-2xl text-[var(--ink)]">Your video</h1>
           {expiresAt ? (
-            <p className="mt-1 text-xs text-zinc-500">
-              Link expires {new Date(expiresAt).toLocaleString()} — download before then.
+            <p className="mt-1 text-xs text-[var(--ink-faint)]">
+              Available until {new Date(expiresAt).toLocaleString()} — download on this machine.
             </p>
           ) : null}
         </div>
@@ -88,68 +89,67 @@ export default function JobResultPage() {
         <aside className="space-y-4">
           {qc ? (
             <div className="surface-panel rounded-2xl p-4 text-sm">
-              <div className="font-semibold text-zinc-100">
+              <div className="font-semibold text-[var(--ink)]">
                 Viral QC: {qc.pass ? "pass" : "warn"} ({qc.score})
               </div>
               {qc.reasons.length ? (
-                <ul className="mt-2 list-disc pl-4 text-xs text-zinc-400">
+                <ul className="mt-2 list-disc pl-4 text-xs text-[var(--ink-muted)]">
                   {qc.reasons.map((r) => (
                     <li key={r}>{r}</li>
                   ))}
                 </ul>
               ) : (
-                <p className="mt-1 text-xs text-zinc-500">Retention structure looks good.</p>
+                <p className="mt-1 text-xs text-[var(--ink-faint)]">Retention structure looks good.</p>
               )}
             </div>
           ) : null}
 
           {captionPack ? (
             <div className="surface-panel space-y-3 rounded-2xl p-4 text-sm">
-              <div className="font-semibold text-zinc-100">Caption pack</div>
-              <p className="text-xs text-zinc-400">{captionPack.description}</p>
+              <div className="font-semibold text-[var(--ink)]">Caption pack</div>
+              <p className="text-xs text-[var(--ink-muted)]">{captionPack.description}</p>
               <div className="flex flex-wrap gap-1.5">
                 {captionPack.hashtags.map((h) => (
                   <span
                     key={h}
-                    className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2 py-0.5 text-[11px] text-cyan-100"
+                    className="rounded-full border border-[color-mix(in_srgb,var(--signal)_25%,transparent)] bg-[var(--signal-dim)] px-2 py-0.5 text-[11px] text-[var(--signal)]"
                   >
                     {h}
                   </span>
                 ))}
               </div>
-              <p className="text-[11px] text-zinc-500">Best time: {captionPack.postingTimeHint}</p>
-              <button
-                type="button"
-                onClick={() => void copy(captionPack.hashtags.join(" "), "hashtags")}
-                className="rounded-xl border border-white/10 px-3 py-1.5 text-xs text-zinc-300"
-              >
-                Copy hashtags
-              </button>
-              <button
-                type="button"
-                onClick={() => void copy(captionPack.fullCaption, "full")}
-                className="ml-2 rounded-xl border border-white/10 px-3 py-1.5 text-xs text-zinc-300"
-              >
-                Copy full caption
-              </button>
+              <p className="text-[11px] text-[var(--ink-faint)]">Best time: {captionPack.postingTimeHint}</p>
+              <div className="flex flex-wrap gap-2">
+                <SecondaryButton
+                  type="button"
+                  onClick={() => void copy(captionPack.hashtags.join(" "), "hashtags")}
+                  className="px-3 py-1.5 text-xs"
+                >
+                  Copy hashtags
+                </SecondaryButton>
+                <SecondaryButton
+                  type="button"
+                  onClick={() => void copy(captionPack.fullCaption, "full")}
+                  className="px-3 py-1.5 text-xs"
+                >
+                  Copy full caption
+                </SecondaryButton>
+              </div>
             </div>
           ) : null}
 
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => void copy(window.location.href, "link")}
-              className="rounded-xl border border-white/10 px-4 py-2 text-sm text-zinc-300"
-            >
+          <div className="flex flex-wrap items-center gap-2">
+            <SecondaryButton type="button" onClick={() => void copy(window.location.href, "link")}>
               Copy share link
-            </button>
+            </SecondaryButton>
             <Link
               href={`/tiktok?jobId=${jobId}`}
-              className="rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-sm font-semibold text-cyan-100"
+              className="relative inline-flex items-center justify-center overflow-hidden rounded-2xl border border-[color-mix(in_srgb,var(--signal)_25%,transparent)] bg-linear-[180deg,#7ce3f8_0%,#48c8ec_52%,#2f9ec5_100%] px-4 py-3 text-sm font-bold text-slate-950 shadow-[0_1px_0_rgba(255,255,255,0.45)_inset,0_12px_30px_rgba(44,167,203,0.28)] transition-all duration-200 hover:-translate-y-px active:scale-[0.985]"
             >
-              Publish to TikTok
+              <span className="pointer-events-none absolute inset-0 signal-sweep bg-[linear-gradient(110deg,transparent_0%,rgba(255,255,255,0.08)_45%,rgba(255,255,255,0.36)_50%,rgba(255,255,255,0.06)_56%,transparent_100%)]" />
+              <span className="relative">Publish to TikTok</span>
             </Link>
-            {copied ? <span className="self-center text-xs text-cyan-300">Copied {copied}!</span> : null}
+            {copied ? <span className="text-xs text-[var(--signal)]">Copied {copied}!</span> : null}
           </div>
         </aside>
       </div>

@@ -1,5 +1,5 @@
-/* Tailwind v4 pre-generated CSS (run: node generate-tailwind.cjs to regenerate) */
-@import "./tailwind-generated.css";
+/* Legacy desktop styles — web UI uses src/app/globals.css + Tailwind via PostCSS. */
+
 
 :root {
   --app-bg: #07080a;

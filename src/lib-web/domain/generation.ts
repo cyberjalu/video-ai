@@ -58,10 +58,121 @@ export function findUiStepIdFromWorkerStep(step: WorkerStep): UiStepId | null {
   return hit?.id ?? null;
 }
 
-export function deriveProgressPercent(steps: UiStep[]) {
-  const done = steps.filter((s) => s.state === "completed").length;
+export function deriveProgressPercent(steps: UiStep[], opts?: { runningElapsedMs?: number }) {
   const total = steps.length;
-  return total ? Math.round((done / total) * 100) : 0;
+  if (!total) return 0;
+  if (steps.every((s) => s.state === "completed")) return 100;
+
+  const done = steps.filter((s) => s.state === "completed").length;
+  const running = steps.some((s) => s.state === "running");
+  const slice = 100 / total;
+  let p = done * slice;
+  if (running) {
+    const creep = opts?.runningElapsedMs
+      ? Math.min(slice * 0.42, (opts.runningElapsedMs / 90_000) * slice * 0.42)
+      : slice * 0.35;
+    p += creep;
+  }
+  return Math.min(99, Math.round(p));
+}
+
+/** Rebuild UI steps from persisted job status (page reload / reconnect). */
+export function hydrateStepsFromJob(opts: {
+  status: string;
+  stage?: string | null;
+  hasPlan: boolean;
+}): UiStep[] {
+  const steps = initialSteps();
+  const { status, hasPlan } = opts;
+
+  if (status === "completed") {
+    return steps.map((s) => ({ ...s, state: "completed" as UiStepState }));
+  }
+
+  if (status === "awaiting_review") {
+    return steps.map((s): UiStep => {
+      if (
+        s.id === "reading_article" ||
+        s.id === "capturing_screenshots" ||
+        s.id === "writing_script"
+      ) {
+        return { ...s, state: "completed" };
+      }
+      if (s.id === "awaiting_assets") return { ...s, state: "running" };
+      return s;
+    });
+  }
+
+  if (status === "planning" || status === "queued") {
+    return steps.map((s, i) =>
+      i === 0 ? { ...s, state: "running" as UiStepState, detail: "Working…" } : s,
+    );
+  }
+
+  if (status === "rendering") {
+    return steps.map((s): UiStep => {
+      if (
+        s.id === "reading_article" ||
+        s.id === "capturing_screenshots" ||
+        s.id === "writing_script" ||
+        s.id === "awaiting_assets"
+      ) {
+        return { ...s, state: "completed" };
+      }
+      if (s.id === "generating_voiceover") {
+        return { ...s, state: "running", detail: "Rendering…" };
+      }
+      return s;
+    });
+  }
+
+  if (status === "failed") {
+    if (hasPlan) {
+      return steps.map((s): UiStep => {
+        if (
+          s.id === "reading_article" ||
+          s.id === "capturing_screenshots" ||
+          s.id === "writing_script" ||
+          s.id === "awaiting_assets"
+        ) {
+          return { ...s, state: "completed" };
+        }
+        if (s.id === "generating_voiceover" || s.id === "rendering_video") {
+          return { ...s, state: "failed" };
+        }
+        return s;
+      });
+    }
+    return steps.map((s, i): UiStep => {
+      if (i === 0) return { ...s, state: "failed" };
+      return s;
+    });
+  }
+
+  return steps;
+}
+
+/** Optimistic UI reset when user hits Continue after cancel/fail. */
+export function resetStepsForContinue(hasPlan: boolean): UiStep[] {
+  if (hasPlan) {
+    return initialSteps().map((s): UiStep => {
+      if (
+        s.id === "reading_article" ||
+        s.id === "capturing_screenshots" ||
+        s.id === "writing_script" ||
+        s.id === "awaiting_assets"
+      ) {
+        return { ...s, state: "completed" };
+      }
+      if (s.id === "generating_voiceover") {
+        return { ...s, state: "running", detail: "Resuming render…" };
+      }
+      return s;
+    });
+  }
+  return initialSteps().map((s, i): UiStep =>
+    i === 0 ? { ...s, state: "running", detail: "Restarting plan…" } : s,
+  );
 }
 
 export function applyWorkerEventToSteps(
@@ -73,6 +184,13 @@ export function applyWorkerEventToSteps(
       s.state === "running" ? { ...s, state: "failed" as UiStepState } : s,
     );
     return { steps: next, status: "failed" };
+  }
+
+  if (e.type === "log") {
+    const next = steps.map((s) =>
+      s.state === "running" ? { ...s, detail: e.message } : s,
+    );
+    return { steps: next };
   }
 
   if (e.type === "done") {
@@ -122,8 +240,9 @@ export function applyWorkerEventToSteps(
     if (!id) return { steps };
 
     const next = steps.map((s): UiStep => {
-      if (s.id === id) return { ...s, state: "running" };
+      if (s.id === id) return { ...s, state: "running", detail: undefined };
       if (s.state === "running") return { ...s, state: "completed" };
+      if (s.state === "failed") return { ...s, state: "pending" };
       return s;
     });
     return { steps: next, status: statusFromUiStepId(id) };
@@ -145,6 +264,18 @@ export function friendlyErrorMessage(raw: string) {
   if (!trimmed) return "Something went wrong while generating your video. Please try again.";
 
   const msg = trimmed.toLowerCase();
+  if (
+    msg.includes("rate limit") ||
+    msg.includes("429") ||
+    msg.includes("quota") ||
+    msg.includes("resource_exhausted") ||
+    msg.includes("too many requests")
+  ) {
+    return "API rate limit hit. Wait a moment, then press Continue to resume.";
+  }
+  if (msg.includes("cancelled by user")) {
+    return "Cancelled. Press Continue to resume from where you left off.";
+  }
   if (msg.includes("paywall") || msg.includes("403") || msg.includes("blocked")) {
     return "We couldn’t read this article. Try another URL or check if the page is behind a paywall.";
   }

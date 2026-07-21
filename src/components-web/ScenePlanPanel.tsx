@@ -24,7 +24,7 @@ function layoutBadge(layout?: string) {
   const label =
     layout === "bar_chart" ? "chart" : layout === "screenshot" ? "shot" : layout;
   return (
-    <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-200">
+    <span className="rounded-full border border-[color-mix(in_srgb,var(--signal)_25%,transparent)] bg-[var(--signal-dim)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--signal)]">
       {label}
     </span>
   );
@@ -76,7 +76,7 @@ function SceneScriptEditor({
   return (
     <div className="mt-3 space-y-2">
       <label className="block">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-faint)]">
           Voiceover / script
         </span>
         <textarea
@@ -84,20 +84,20 @@ function SceneScriptEditor({
           onChange={(e) => setDraftVoiceover(e.target.value)}
           onBlur={() => commit()}
           rows={3}
-          className="mt-1 w-full resize-y rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm leading-relaxed text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-cyan-400/30 focus:ring-1 focus:ring-cyan-400/20"
+          className="mt-1 w-full resize-y rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm leading-relaxed text-[var(--ink)] placeholder:text-[var(--ink-faint)] outline-none focus:border-[color-mix(in_srgb,var(--signal)_35%,transparent)] focus:ring-1 focus:ring-[color-mix(in_srgb,var(--signal)_25%,transparent)]"
           placeholder="Script for this scene…"
         />
       </label>
       <label className="block">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
-          Captions <span className="font-normal normal-case tracking-normal text-zinc-600">(1–2 lines)</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-faint)]">
+          Captions <span className="font-normal normal-case tracking-normal text-[var(--ink-faint)]">(1–2 lines)</span>
         </span>
         <textarea
           value={draftCaptions}
           onChange={(e) => setDraftCaptions(e.target.value)}
           onBlur={() => commit()}
           rows={2}
-          className="mt-1 w-full resize-y rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm leading-relaxed text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-cyan-400/30 focus:ring-1 focus:ring-cyan-400/20"
+          className="mt-1 w-full resize-y rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm leading-relaxed text-[var(--ink)] placeholder:text-[var(--ink-faint)] outline-none focus:border-[color-mix(in_srgb,var(--signal)_35%,transparent)] focus:ring-1 focus:ring-[color-mix(in_srgb,var(--signal)_25%,transparent)]"
           placeholder="On-screen caption lines…"
         />
       </label>
@@ -282,18 +282,18 @@ export function ScenePlanPanel({
   return (
     <details className="group" open={canEdit || undefined}>
       <summary className="list-none">
-        <Card className="cursor-pointer p-5 transition-all duration-200 hover:-translate-y-px hover:border-cyan-300/15 hover:bg-zinc-900/70">
+        <Card className="cursor-pointer p-5 transition-all duration-200 hover:-translate-y-px hover:border-[color-mix(in_srgb,var(--signal)_20%,transparent)] hover:bg-[var(--panel-raised)]">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
-              <Layers3 className="h-4 w-4 text-cyan-200/80" />
+            <div className="flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
+              <Layers3 className="h-4 w-4 text-[var(--signal)]/80" />
               Scene plan
-              <span className="ml-2 text-xs font-semibold text-zinc-400">
+              <span className="ml-2 text-xs font-semibold text-[var(--ink-muted)]">
                 {currentPlan.scenes.length} scenes · {currentPlan.target_duration_sec}s
               </span>
             </div>
-            <ChevronDown className="h-4 w-4 text-zinc-400 transition group-open:rotate-180" />
+            <ChevronDown className="h-4 w-4 text-[var(--ink-muted)] transition group-open:rotate-180" />
           </div>
-          <div className="mt-2 text-sm text-zinc-400">
+          <div className="mt-2 text-sm text-[var(--ink-muted)]">
             {canEdit
               ? "Edit voiceover, duration, scenes, and media. Empty scenes auto-fill from Pexels when you continue."
               : "Optional details for advanced users. You can skim or ignore this section."}
@@ -304,7 +304,7 @@ export function ScenePlanPanel({
       <div className="mt-3 space-y-2">
         {canEdit ? (
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/[0.06] bg-black/25 px-3 py-2.5">
-            <div className="text-xs text-zinc-500">
+            <div className="text-xs text-[var(--ink-faint)]">
               {currentPlan.scenes.length}/{MAX_SCENES} scenes · min {MIN_SCENES} required
             </div>
             <SecondaryButton
@@ -349,13 +349,13 @@ export function ScenePlanPanel({
                 <div
                   className={cn(
                     "h-[72px] w-[128px] shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/40",
-                    !thumb && !hasVideo ? "grid place-items-center text-xs text-zinc-500" : "",
+                    !thumb && !hasVideo ? "grid place-items-center text-xs text-[var(--ink-faint)]" : "",
                   )}
                 >
                   {thumb ? (
                     <img src={thumb} className="h-full w-full object-cover" alt="" />
                   ) : hasVideo ? (
-                    <div className="grid h-full place-items-center text-zinc-400">
+                    <div className="grid h-full place-items-center text-[var(--ink-muted)]">
                       <Video className="h-5 w-5" />
                     </div>
                   ) : (
@@ -365,14 +365,14 @@ export function ScenePlanPanel({
 
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="truncate text-sm font-semibold text-zinc-100">
+                    <div className="truncate text-sm font-semibold text-[var(--ink)]">
                       Scene {idx + 1} · {roleLabel(s.role)}
-                      <span className="ml-1.5 font-normal text-zinc-600">({s.id})</span>
+                      <span className="ml-1.5 font-normal text-[var(--ink-faint)]">({s.id})</span>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       {layoutBadge(s.layout)}
                       {hasVideo ? (
-                        <span className="rounded-full border border-sky-400/20 bg-sky-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-200">
+                        <span className="rounded-full border border-[color-mix(in_srgb,var(--signal)_25%,transparent)] bg-[var(--signal-dim)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--signal)]">
                           broll
                         </span>
                       ) : null}
@@ -382,7 +382,7 @@ export function ScenePlanPanel({
                         </span>
                       ) : null}
                       {canEdit ? (
-                        <label className="flex items-center gap-1 text-xs font-semibold text-zinc-400">
+                        <label className="flex items-center gap-1 text-xs font-semibold text-[var(--ink-muted)]">
                           <input
                             type="number"
                             min={3}
@@ -392,18 +392,18 @@ export function ScenePlanPanel({
                               const v = Number(e.currentTarget.value);
                               if (Number.isFinite(v)) void commitDuration(s.id, v);
                             }}
-                            className="w-10 rounded-lg border border-white/10 bg-black/40 px-1.5 py-0.5 text-center text-zinc-200 outline-none focus:border-cyan-400/30"
+                            className="w-10 rounded-lg border border-white/10 bg-black/40 px-1.5 py-0.5 text-center text-[var(--ink)] outline-none focus:border-[color-mix(in_srgb,var(--signal)_35%,transparent)]"
                             aria-label={`Duration for scene ${idx + 1}`}
                           />
                           s
                         </label>
                       ) : (
-                        <div className="text-xs font-semibold text-zinc-400">{s.duration_sec}s</div>
+                        <div className="text-xs font-semibold text-[var(--ink-muted)]">{s.duration_sec}s</div>
                       )}
                       {showRemoveScene ? (
                         <SecondaryButton
                           type="button"
-                          className="rounded-lg px-2 py-1.5 text-xs text-zinc-400 hover:text-red-300"
+                          className="rounded-lg px-2 py-1.5 text-xs text-[var(--ink-muted)] hover:text-red-300"
                           title="Remove scene"
                           aria-label={`Remove scene ${idx + 1}`}
                           onClick={(e) => {
@@ -426,25 +426,25 @@ export function ScenePlanPanel({
                     />
                   ) : (
                     <>
-                      {caption ? <div className="mt-1 text-sm text-zinc-300">{caption}</div> : null}
+                      {caption ? <div className="mt-1 text-sm text-[var(--ink-muted)]">{caption}</div> : null}
                       {s.voiceover ? (
-                        <div className="mt-1 line-clamp-2 text-sm text-zinc-400">{s.voiceover}</div>
+                        <div className="mt-1 line-clamp-2 text-sm text-[var(--ink-muted)]">{s.voiceover}</div>
                       ) : null}
                     </>
                   )}
 
                   {s.pexels_query ? (
-                    <div className="mt-1 text-[11px] text-zinc-500">Query: {s.pexels_query}</div>
+                    <div className="mt-1 text-[11px] text-[var(--ink-faint)]">Query: {s.pexels_query}</div>
                   ) : null}
                   {s.pexels_credit ? (
-                    <div className="mt-0.5 text-[11px] text-zinc-500">{s.pexels_credit}</div>
+                    <div className="mt-0.5 text-[11px] text-[var(--ink-faint)]">{s.pexels_credit}</div>
                   ) : null}
                   {s.callouts?.length ? (
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {s.callouts.slice(0, 2).map((c) => (
                         <span
                           key={c}
-                          className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] font-semibold text-zinc-200"
+                          className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] font-semibold text-[var(--ink)]"
                         >
                           {c}
                         </span>
@@ -455,7 +455,7 @@ export function ScenePlanPanel({
                   {canEdit ? (
                     <div className="mt-3 grid gap-2 sm:grid-cols-2">
                       <label className="grid gap-1">
-                        <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-faint)]">
                           Visual layout
                         </span>
                         <select
@@ -466,7 +466,7 @@ export function ScenePlanPanel({
                               e.currentTarget.value as VideoPlan["scenes"][number]["layout"],
                             )
                           }
-                          className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-cyan-400/30"
+                          className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[color-mix(in_srgb,var(--signal)_35%,transparent)]"
                         >
                           <option value="screenshot">Screenshot</option>
                           <option value="big_callout">Big callout</option>
@@ -477,7 +477,7 @@ export function ScenePlanPanel({
                         </select>
                       </label>
                       <label className="grid gap-1">
-                        <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-faint)]">
                           Callout chips
                         </span>
                         <input
@@ -486,7 +486,7 @@ export function ScenePlanPanel({
                           key={`${s.id}-${(s.callouts ?? []).join("|")}`}
                           onBlur={(e) => void commitCallouts(s.id, e.currentTarget.value)}
                           placeholder="e.g. 10x faster, $2B"
-                          className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-cyan-400/30"
+                          className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[color-mix(in_srgb,var(--signal)_35%,transparent)]"
                         />
                       </label>
                     </div>
@@ -533,7 +533,7 @@ export function ScenePlanPanel({
           <button
             type="button"
             onClick={() => void addScene()}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-cyan-300/25 bg-cyan-300/[0.04] px-4 py-3.5 text-sm font-semibold text-cyan-100/90 transition-all duration-200 hover:-translate-y-px hover:border-cyan-300/40 hover:bg-cyan-300/[0.08] active:translate-y-0"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-[color-mix(in_srgb,var(--signal)_30%,transparent)] bg-[var(--signal-dim)] px-4 py-3.5 text-sm font-semibold text-[var(--signal)] transition-all duration-200 hover:-translate-y-px hover:border-[color-mix(in_srgb,var(--signal)_40%,transparent)] hover:brightness-110 active:translate-y-0"
           >
             <Plus className="h-4 w-4" />
             Add scene

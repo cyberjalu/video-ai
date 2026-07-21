@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { readJob, writePlan, clearTtsCache, readPlan } from "@/server/jobs/store";
+import { readJob, writePlan, clearTtsCache, readPlan, jobDir } from "@/server/jobs/store";
 import { VideoPlanSchema } from "@/server/security/plan-schema";
 import { requireJobToken } from "@/server/security/job-token";
 import { assertValidJobId } from "@/server/security/ids";
@@ -32,6 +32,18 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ jobId: string
 
   await writePlan(jobId, plan);
   if (voiceChanged) await clearTtsCache(jobId);
+
+  // Advisory: mark plan as user-edited so pipeline never auto-rewrites over manual craft.
+  try {
+    const fs = await import("node:fs/promises");
+    const path = await import("node:path");
+    await fs.writeFile(
+      path.join(jobDir(jobId), "user_edited_plan.json"),
+      JSON.stringify({ editedAt: new Date().toISOString() }),
+    );
+  } catch {
+    /* non-fatal */
+  }
 
   return NextResponse.json({ ok: true, plan });
 }

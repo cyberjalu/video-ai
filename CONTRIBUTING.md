@@ -51,7 +51,7 @@ Job artifacts are stored under `data/jobs/` (configurable via `JOB_DATA_DIR`).
 - Prefer small, focused PRs.
 - Do not commit API keys, `.env`, or `data/jobs/` artifacts.
 - Match existing TypeScript / React patterns.
-- After changing Tailwind classes, ensure `npm run generate:css` / build still works.
+- After changing Tailwind classes, `npm run build` (or `npm run dev`) compiles CSS via `@tailwindcss/postcss` — no separate generate step.
 
 ## License
 

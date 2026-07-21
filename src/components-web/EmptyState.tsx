@@ -17,22 +17,24 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-white/[0.12] bg-white/[0.02] px-6 py-10 text-center",
+        "flex flex-col items-center justify-center gap-4 rounded-[var(--app-radius-lg)] border border-dashed border-[var(--line)] bg-[var(--panel)]/60 px-6 py-12 text-center",
         className,
       )}
     >
       {icon ? (
-        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/5 text-zinc-500">
+        <div className="grid h-11 w-11 place-items-center rounded-xl border border-[var(--line)] bg-[var(--void)] text-[var(--ink-faint)]">
           {icon}
         </div>
       ) : null}
       <div>
-        <div className="text-sm font-semibold text-zinc-400">{title}</div>
+        <div className="text-sm font-semibold text-[var(--ink-muted)]">{title}</div>
         {description ? (
-          <div className="mt-1 max-w-[280px] text-xs leading-relaxed text-zinc-600">{description}</div>
+          <div className="mx-auto mt-1.5 max-w-[300px] text-[13px] leading-relaxed text-[var(--ink-faint)]">
+            {description}
+          </div>
         ) : null}
       </div>
-      {children ? <div className="mt-2">{children}</div> : null}
+      {children ? <div className="mt-1">{children}</div> : null}
     </div>
   );
 }

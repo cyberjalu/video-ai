@@ -52,4 +52,21 @@ describe("generation helpers", () => {
     expect(result.steps.find((s) => s.id === "awaiting_assets")?.state).toBe("running");
     expect(result.steps.find((s) => s.id === "writing_script")?.state).toBe("completed");
   });
+
+  it("surfaces log messages on the running step", () => {
+    let steps = initialSteps();
+    ({ steps } = applyWorkerEventToSteps(steps, { type: "step_start", step: "tts" }));
+    const result = applyWorkerEventToSteps(steps, {
+      type: "log",
+      message: "Generating voiceover for scene 2…",
+    });
+    expect(result.steps.find((s) => s.id === "generating_voiceover")?.detail).toContain(
+      "scene 2",
+    );
+  });
+
+  it("maps rate-limit errors to a continue-friendly message", () => {
+    expect(friendlyErrorMessage("429 RESOURCE_EXHAUSTED rate limit")).toMatch(/rate limit/i);
+    expect(friendlyErrorMessage("Cancelled by user")).toMatch(/Continue/i);
+  });
 });

@@ -1331,6 +1331,11 @@ ${secondHookRule}
 ${calloutRule}
 ${layoutRule}
 - Ưu tiên câu ngắn, từ dễ hiểu, không hỏi kết mở.
+- CRAFT (đạo diễn): hook PHẢI cụ thể (số / tình huống / hành động định danh) — cấm câu hỏi chung kiểu "bạn còn làm X?".
+- Mỗi scene thêm beat MỚI; re_hook phải ĐỔI GÓC / tăng tension, không paraphrase hook ("quên cách cũ / đã có sản phẩm").
+- Có beat bằng chứng (screenshot/stat/so sánh) khớp lời thoại; KHÔNG bịa số liệu ngoài nguồn.
+- Giọng kể chuyện tự nhiên — cấm slogan brochure ("bạn xứng đáng hơn", "đừng chần chừ").
+- takeaway = hành động rõ + lý do gắn beat trước.
 
 Tiêu đề bài: ${title}
 Nội dung bài (đã trích):\n${articleText.slice(0, 12000)}`;
@@ -1463,7 +1468,8 @@ Ràng buộc chung:
 - voiceover mở đầu bằng câu diễn giải lại caption_lines.
 ${calloutRule}
 ${layoutRule}
-- Giọng văn: Kể chuyện hấp dẫn, cuốn hút, dứt khoát.
+- Giọng văn: Kể chuyện hấp dẫn như đồng nghiệp cảnh báo — dứt khoát, không brochure.
+- CRAFT: hook cụ thể (số/tình huống/hành động); mỗi scene beat mới; re_hook escalate góc; proof khớp nguồn; CTA = action + reason; KHÔNG bịa số liệu.
 ${pageBlock}
 Yêu cầu/Ý tưởng của người dùng:
 "${userPrompt}"`;

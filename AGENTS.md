@@ -5,11 +5,11 @@
 
 | Field | Value |
 |-------|-------|
-| Branch | `007-web-free-product` |
-| Spec | [specs/007-web-free-product/spec.md](specs/007-web-free-product/spec.md) |
-| Plan | [specs/007-web-free-product/plan.md](specs/007-web-free-product/plan.md) |
-| Research | [specs/007-web-free-product/research.md](specs/007-web-free-product/research.md) |
-| Tasks | [specs/007-web-free-product/tasks.md](specs/007-web-free-product/tasks.md) (run `/speckit-implement`) |
+| Branch | `009-local-ui-polish` |
+| Spec | [specs/009-local-ui-polish/spec.md](specs/009-local-ui-polish/spec.md) |
+| Plan | [specs/009-local-ui-polish/plan.md](specs/009-local-ui-polish/plan.md) |
+| Research | [specs/009-local-ui-polish/research.md](specs/009-local-ui-polish/research.md) |
+| Tasks | [specs/009-local-ui-polish/tasks.md](specs/009-local-ui-polish/tasks.md) (run `/speckit-implement`) |
 
-**Goal**: Migrate ClipNews from Tauri desktop to a 100% web-based free product — template-first anonymous generation, server-side Remotion pipeline, no auth/billing.
+**Goal**: Polish UI/animation cho trải nghiệm **clone chạy local** — CSS motion tokens thật sự chạy, studio home, click/render cinematic; giữ dark cyan neon, không hướng SaaS host.
 <!-- SPECKIT END -->

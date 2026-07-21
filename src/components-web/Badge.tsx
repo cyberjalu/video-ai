@@ -5,13 +5,15 @@ export function Badge({
   variant = "default",
   className,
   ...props
-}: React.HTMLAttributes<HTMLSpanElement> & { variant?: "default" | "accent" | "success" | "danger" | "muted" }) {
+}: React.HTMLAttributes<HTMLSpanElement> & {
+  variant?: "default" | "accent" | "success" | "danger" | "muted";
+}) {
   const variants = {
-    default: "border-white/10 bg-white/5 text-zinc-200",
-    accent: "border-cyan-300/20 bg-cyan-300/10 text-cyan-100",
+    default: "border-[var(--line)] bg-white/5 text-[var(--ink)]",
+    accent: "border-[color-mix(in_srgb,var(--signal)_25%,transparent)] bg-[var(--signal-dim)] text-[var(--signal)]",
     success: "border-emerald-400/20 bg-emerald-400/10 text-emerald-100",
     danger: "border-red-400/20 bg-red-400/10 text-red-100",
-    muted: "border-white/[0.06] bg-white/[0.03] text-zinc-400",
+    muted: "border-[var(--line-soft)] bg-white/[0.03] text-[var(--ink-muted)]",
   } as const;
 
   return (
@@ -25,4 +27,3 @@ export function Badge({
     />
   );
 }
-
