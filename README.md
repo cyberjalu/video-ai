@@ -320,8 +320,13 @@ Xem [`.env.example`](.env.example).
 | `TIKTOK_CLIENT_SECRET` | — | TikTok OAuth |
 | `TIKTOK_REDIRECT_URI` | — | Callback, vd. `http://localhost:3000/api/tiktok/callback` |
 | `GEMINI_API_KEY` | — | Tuỳ chọn cho CLI / health; web dùng BYOK |
+| `GEMINI_MAX_RPM` | `10` | Trần RPM local (free Flash ≈ **15** Peak RPM — giữ thấp hơn) |
+| `GEMINI_MIN_GAP_MS` | `6000` | Khoảng cách tối thiểu giữa 2 request Gemini |
+| `GEMINI_RETRY_MAX` | `5` | Số lần retry khi 429 / RESOURCE_EXHAUSTED |
 
 Key Gemini/Pexels từ trình duyệt **không** được ghi vào `request.json` trên đĩa.
+
+**Free-tier tip:** Google AI Studio đo *Peak requests per minute*. ClipNews throttle mọi `generateContent` (plan, TTS, craft, caption) qua file lock dùng chung giữa Next server và worker để Peak RPM không vượt ~10 (có thể chỉnh bằng `GEMINI_MAX_RPM`). Log pipeline sẽ hiện khi đang chờ slot.
 
 ---
 

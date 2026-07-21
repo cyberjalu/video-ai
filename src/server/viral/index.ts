@@ -1,5 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import type { GenerationRequest, VideoPlan } from "@/lib/domain/types";
+import { generateGeminiContent } from "@/server/gemini/rate-limit";
+import { log } from "@/server/logging";
 
 export {
   runCraftQc,
@@ -46,6 +48,15 @@ function detectTone(request: GenerationRequest): ViralTone {
   return "news";
 }
 
+function geminiServerWait(label: string) {
+  return {
+    label,
+    onWait: ({ waitMs, reason }: { waitMs: number; reason: string }) => {
+      log.info("gemini_throttle_wait", { label, waitMs, reason });
+    },
+  };
+}
+
 export async function generateViralBrief(request: GenerationRequest): Promise<ViralBrief | null> {
   const gemini = request.keys.gemini?.trim();
   if (!gemini) return null;
@@ -72,10 +83,14 @@ Return ONLY JSON:
   "enhancedPrompt": "2-4 sentence brief for a video writer: specific hook, escalating re-hook (new angle), proof beats, conversational voice (no brochure slogans), CTA with reason, FYP pacing"
 }`;
 
-  const res = await ai.models.generateContent({
-    model,
-    contents: prompt,
-  });
+  const res = await generateGeminiContent(
+    ai,
+    {
+      model,
+      contents: prompt,
+    },
+    geminiServerWait("viral-brief"),
+  );
   const text = res.text ?? "";
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) return null;
@@ -115,10 +130,14 @@ Return ONLY JSON:
   "postingTimeHint": "e.g. evenings 7-9pm local"
 }`;
 
-  const res = await ai.models.generateContent({
-    model: "gemini-3.5-flash",
-    contents: prompt,
-  });
+  const res = await generateGeminiContent(
+    ai,
+    {
+      model: "gemini-3.5-flash",
+      contents: prompt,
+    },
+    geminiServerWait("caption-pack"),
+  );
   const text = res.text ?? "";
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) return null;

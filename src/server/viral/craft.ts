@@ -1,5 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import type { VideoPlan } from "@/lib/domain/types";
+import { generateGeminiContent } from "@/server/gemini/rate-limit";
+import { log } from "@/server/logging";
 
 export type CraftCriterionId =
   | "hook_specific"
@@ -394,10 +396,19 @@ Rules:
 - escalatePass=true if re_hook changes angle/tension vs hook (not "forget old way / use product" paraphrase).
 Scenes:
 ${scenes}`;
-    const res = await ai.models.generateContent({
-      model: contentModel || "gemini-2.5-flash",
-      contents: prompt,
-    });
+    const res = await generateGeminiContent(
+      ai,
+      {
+        model: contentModel || "gemini-2.5-flash",
+        contents: prompt,
+      },
+      {
+        label: "craft-judge",
+        onWait: ({ waitMs, reason }) => {
+          log.info("gemini_throttle_wait", { label: "craft-judge", waitMs, reason });
+        },
+      },
+    );
     const text = res.text ?? "";
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) return null;

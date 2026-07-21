@@ -11,6 +11,7 @@ import { bundle } from "@remotion/bundler";
 import { getCompositions, renderMedia } from "@remotion/renderer";
 import { execFile } from "node:child_process";
 import { extractHttpUrls } from "../src/lib-web/domain/urls.ts";
+import { generateGeminiContent, isGeminiRateLimitError } from "../src/server/gemini/rate-limit.ts";
 
 const execFileP = (file: string, args: string[]) =>
   new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
@@ -78,10 +79,14 @@ Quy tắc:
 
   let lastError = "";
   for (let attempt = 1; attempt <= 2; attempt++) {
-    const res = await ai.models.generateContent({
-      model: prefs.contentModel || "gemini-3.5-flash",
-      contents: [{ parts: [{ text: prompt }] }],
-    });
+    const res = await generateGeminiContent(
+      ai,
+      {
+        model: prefs.contentModel || "gemini-3.5-flash",
+        contents: [{ parts: [{ text: prompt }] }],
+      },
+      geminiWaitLog("plan-from-script"),
+    );
 
     try {
       const parsed = parsePlanFromModelOutput(res.text ?? "");
@@ -340,9 +345,29 @@ async function withRetry<T>(label: string, fn: () => Promise<T>, attempts = 2): 
         type: "log",
         message: `${label} failed (attempt ${i}/${attempts}): ${e instanceof Error ? e.message : String(e)}`,
       });
+      if (isGeminiRateLimitError(e) && i < attempts) {
+        const backoff = Math.min(60_000, 3000 * 2 ** (i - 1));
+        emit({
+          type: "log",
+          message: `${label}: rate limited — waiting ${Math.ceil(backoff / 1000)}s before retry`,
+        });
+        await new Promise((r) => setTimeout(r, backoff));
+      }
     }
   }
   throw last instanceof Error ? last : new Error(String(last));
+}
+
+function geminiWaitLog(label: string) {
+  return {
+    label,
+    onWait: ({ waitMs, reason }: { waitMs: number; reason: string }) => {
+      emit({
+        type: "log",
+        message: `Gemini throttle (${label}): waiting ${Math.ceil(waitMs / 1000)}s — ${reason}`,
+      });
+    },
+  };
 }
 
 function emit(event: unknown) {
@@ -1354,10 +1379,14 @@ async function planVideoWithGemini(articleText: string, title: string, geminiKey
 
   let lastError = "";
   for (let attempt = 1; attempt <= 2; attempt++) {
-    const res = await ai.models.generateContent({
-      model: prefs.contentModel || "gemini-3.5-flash",
-      contents: [{ parts: [{ text: prompt }] }],
-    });
+    const res = await generateGeminiContent(
+      ai,
+      {
+        model: prefs.contentModel || "gemini-3.5-flash",
+        contents: [{ parts: [{ text: prompt }] }],
+      },
+      geminiWaitLog("plan-from-article"),
+    );
 
     try {
       const parsed = parsePlanFromModelOutput(res.text ?? "");
@@ -1487,10 +1516,14 @@ async function planVideoFromPromptWithGemini(
 
   let lastError = "";
   for (let attempt = 1; attempt <= 2; attempt++) {
-    const res = await ai.models.generateContent({
-      model: prefs.contentModel || "gemini-3.5-flash",
-      contents: [{ parts: [{ text: prompt }] }],
-    });
+    const res = await generateGeminiContent(
+      ai,
+      {
+        model: prefs.contentModel || "gemini-3.5-flash",
+        contents: [{ parts: [{ text: prompt }] }],
+      },
+      geminiWaitLog("plan-from-prompt"),
+    );
 
     try {
       const parsed = parsePlanFromModelOutput(res.text ?? "");
@@ -1570,8 +1603,9 @@ async function geminiTtsToWav(
   const ai = new GoogleGenAI({ apiKey: geminiKey });
   const model = audioModel || "gemini-3.1-flash-tts-preview";
 
-  const response = await withRetry("Gemini TTS", () =>
-    ai.models.generateContent({
+  const response = await generateGeminiContent(
+    ai,
+    {
       model,
       contents: [{ parts: [{ text }] }],
       config: {
@@ -1582,7 +1616,8 @@ async function geminiTtsToWav(
           },
         },
       },
-    }),
+    },
+    geminiWaitLog("tts"),
   );
 
   const dataB64 = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
@@ -1683,10 +1718,14 @@ Trả về JSON theo schema đầy đủ (giống input) và vẫn phải có:
 INPUT PLAN JSON:
 ${JSON.stringify(plan)}`;
 
-  const res = await ai.models.generateContent({
-    model: prefs.contentModel || "gemini-3.5-flash",
-    contents: [{ parts: [{ text: prompt }] }],
-  });
+  const res = await generateGeminiContent(
+    ai,
+    {
+      model: prefs.contentModel || "gemini-3.5-flash",
+      contents: [{ parts: [{ text: prompt }] }],
+    },
+    geminiWaitLog("voiceover-rewrite"),
+  );
   const parsed = parsePlanFromModelOutput(res.text ?? "");
   const rewritten = normalizePlan(parsed, prefs);
   emit({
