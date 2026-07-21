@@ -3,10 +3,8 @@
 import type React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useRef } from "react";
 import { PageEnter } from "./PageEnter";
 import { cn } from "@/lib/cn";
-import { gsap, useGSAP, withMotionPreference } from "@/lib/gsap-client";
 
 const NAV = [
   { href: "/templates", label: "Templates" },
@@ -22,36 +20,14 @@ export function WebShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname() ?? "/";
-  const shell = useRef<HTMLDivElement>(null);
-
-  useGSAP(
-    () =>
-      withMotionPreference(() => {
-        gsap.from(".gsap-nav-brand", {
-          x: -10,
-          autoAlpha: 0,
-          duration: 0.45,
-          ease: "power2.out",
-        });
-        gsap.from(".gsap-nav-link", {
-          y: -8,
-          autoAlpha: 0,
-          duration: 0.4,
-          stagger: 0.05,
-          ease: "power2.out",
-          delay: 0.08,
-        });
-      }),
-    { scope: shell },
-  );
 
   return (
-    <div ref={shell} className="relative min-h-[100dvh] bg-[var(--void)] text-[var(--ink)]">
+    <div className="relative min-h-[100dvh] bg-[var(--void)] text-[var(--ink)]">
       <div className="pointer-events-none fixed inset-0 bg-clipnews-radial opacity-90" />
 
       <div className="relative mx-auto flex min-h-[100dvh] w-full max-w-[1120px] flex-col px-4 pb-12 pt-4 md:px-8 md:pt-5">
         <nav className="mb-8 flex h-12 items-center justify-between gap-4 border-b border-[var(--line-soft)] pb-4">
-          <Link href="/" className="gsap-nav-brand group flex items-center gap-3">
+          <Link href="/" className="group flex items-center gap-3">
             <span
               className="tally-blink h-2 w-2 rounded-full bg-[var(--tally)] shadow-[0_0_12px_rgba(245,197,24,0.65)]"
               aria-hidden
@@ -68,10 +44,10 @@ export function WebShell({
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "gsap-nav-link rounded-lg px-3 py-1.5 text-[13px] font-medium transition active:scale-[0.98]",
+                    "rounded-lg px-3 py-1.5 text-[13px] font-medium transition active:scale-[0.98]",
                     active
                       ? "bg-[var(--signal-dim)] text-[var(--signal)]"
-                      : "text-[var(--ink-faint)] hover:bg-white/[0.03] hover:text-[var(--ink)]",
+                      : "text-[var(--ink-muted)] hover:bg-white/[0.03] hover:text-[var(--ink)]",
                   )}
                 >
                   {item.label}

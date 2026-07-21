@@ -61,11 +61,12 @@ export function GenerationStepper({
         if (entered.current) return;
         entered.current = true;
         gsap.from(".gsap-step-row", {
-          x: -10,
-          autoAlpha: 0,
+          x: -8,
+          opacity: 0,
           duration: 0.35,
           stagger: 0.04,
           ease: "power2.out",
+          clearProps: "opacity,transform",
         });
       }),
     { scope: root },
