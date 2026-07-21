@@ -26,7 +26,7 @@ export function HomeStatus() {
   }
 
   return (
-    <div className="rise rise-delay-1 mb-5 inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--panel)] px-3 py-1">
+    <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--panel)] px-3 py-1">
       <span
         className={`h-1.5 w-1.5 rounded-full ${hasGemini ? "tally-blink bg-[var(--tally)]" : "bg-[var(--ink-faint)]"}`}
       />
@@ -53,7 +53,7 @@ export function HomeCtas({ primaryHref }: { primaryHref: string }) {
   }, []);
 
   return (
-    <div className="rise rise-delay-3 mt-8 flex flex-wrap items-center gap-3">
+    <div className="mt-8 flex flex-wrap items-center gap-3">
       <Link href={primaryHref}>
         <PrimaryButton type="button">New video</PrimaryButton>
       </Link>
